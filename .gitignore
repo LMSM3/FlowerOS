@@ -1,0 +1,37 @@
+# Visual Studio
+.vs/
+*.suo
+*.user
+*.sln.docstates
+
+# Build artifacts
+*.o
+*.exe
+*.out
+*.dSYM/
+
+# Core binaries (built by build.sh)
+/random
+/animate
+/banner
+/fortune
+/colortest
+/visual
+/flower-guy
+/flower-walk
+/fp
+/flower-run
+/flower-chess
+/flower-colony
+/flower-td
+/flower-play
+
+# OS / editor junk
+.DS_Store
+Thumbs.db
+*~
+*.swp
+*.swo
+
+# FlowerOS local state (not repo content)
+auth

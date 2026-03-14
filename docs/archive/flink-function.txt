@@ -1,0 +1,29 @@
+
+# ═══════════════════════════════════════════════════════════════════════════
+#  🔗 flink() - FlowerOS silent initialization (no MOTD)
+# ═══════════════════════════════════════════════════════════════════════════
+
+flink() {
+    export FLOWEROS_DIR="/mnt/c/Users/Liam/Desktop/FlowerOS"
+    
+    # Load preferences
+    [ -f "$HOME/.floweros/preferences.conf" ] && source "$HOME/.floweros/preferences.conf"
+    
+    # Apply theme only
+    if [ -f "$FLOWEROS_DIR/features/v1.1/theming-pro/FlowerOS-Bash.sh" ]; then
+        source "$FLOWEROS_DIR/features/v1.1/theming-pro/FlowerOS-Bash.sh"
+    fi
+    
+    # Set up aliases
+    alias flower='floweros-tree'
+    alias fconf='floweros-config'
+    alias fbuild="cd $FLOWEROS_DIR && bash build-motd.sh"
+    alias ftest="cd $FLOWEROS_DIR && bash test-all.sh"
+    
+    # Suppress MOTD
+    export FLOWEROS_WELCOME_SHOWN=1
+    
+    echo "🔗 FlowerOS linked (theme active, MOTD suppressed)"
+}
+
+export -f flink

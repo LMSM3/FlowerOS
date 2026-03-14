@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+# flink - FlowerOS silent initialization (standalone script)
+# Can be called from anywhere: wsl flink
+
+export FLOWEROS_DIR="/mnt/c/Users/Liam/Desktop/FlowerOS"
+
+# Load preferences
+[ -f "$HOME/.floweros/preferences.conf" ] && source "$HOME/.floweros/preferences.conf"
+
+# Apply theme to current shell
+if [ -f "$FLOWEROS_DIR/features/v1.1/theming-pro/FlowerOS-Bash.sh" ]; then
+    source "$FLOWEROS_DIR/features/v1.1/theming-pro/FlowerOS-Bash.sh"
+fi
+
+# Suppress MOTD for this session
+export FLOWEROS_WELCOME_SHOWN=1
+
+echo "🔗 FlowerOS linked (theme active, MOTD suppressed)"
+echo ""
+echo "Aliases available in this shell:"
+echo "  f, flower    - Show FlowerOS tree"
+echo "  fconf        - Configure FlowerOS"
+echo "  fbuild       - Build MOTD ASCII art"
+echo "  ftest        - Run all tests"
+echo ""
+echo "To make permanent, add to ~/.bashrc or run:"
+echo "  source ~/.bashrc"
+echo ""

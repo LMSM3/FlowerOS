@@ -1,0 +1,336 @@
+#!/usr/bin/env bash
+# ═══════════════════════════════════════════════════════════════════════════
+#  FlowerOS Core System Integration v1.3.0
+#
+#  Sourced by ~/.bashrc (user mode) or /etc/bash.bashrc (permanent mode).
+#  Paths are set by the installer via FLOWEROS_ROOT before this file loads;
+#  if nothing is pre-set, /opt/floweros is assumed (permanent default).
+# ═══════════════════════════════════════════════════════════════════════════
+
+# Prevent double-loading
+[[ -n "${FLOWEROS_LOADED:-}" ]] && return 0
+export FLOWEROS_LOADED=1
+
+# ═══════════════════════════════════════════════════════════════════════════
+#  PATHS  (inherit from environment, or fall back to permanent defaults)
+# ═══════════════════════════════════════════════════════════════════════════
+
+export FLOWEROS_ROOT="${FLOWEROS_ROOT:-/opt/floweros}"
+export FLOWEROS_BIN="${FLOWEROS_BIN:-${FLOWEROS_ROOT}/bin}"
+export FLOWEROS_LIB="${FLOWEROS_LIB:-${FLOWEROS_ROOT}/lib}"
+export FLOWEROS_ASCII="${FLOWEROS_ASCII:-${FLOWEROS_ROOT}/ascii}"
+export FLOWEROS_DATA="${FLOWEROS_DATA:-${FLOWEROS_ROOT}/data}"
+export FLOWEROS_CONFIG="${FLOWEROS_CONFIG:-/etc/floweros}"
+
+# Add to system PATH
+[[ ":$PATH:" != *":${FLOWEROS_BIN}:"* ]] && export PATH="${FLOWEROS_BIN}:${PATH}"
+
+# ═══════════════════════════════════════════════════════════════════════════
+#  CORE FUNCTIONS (Native Shell Integration)
+# ═══════════════════════════════════════════════════════════════════════════
+
+flower_pick_ascii_line() {
+  local dir="${FLOWEROS_ASCII_DIR:-$FLOWEROS_ASCII}"
+  
+  # Try compiled helper first
+  if [[ -x "$FLOWEROS_BIN/random" ]]; then
+    local out
+    out="$("$FLOWEROS_BIN/random" "$dir" 2>/dev/null)" && [[ -n "$out" ]] && {
+      printf "%s" "$out"
+      return 0
+    }
+  fi
+  
+  # Shell fallback
+  local files
+  mapfile -t files < <(find "$dir" -maxdepth 1 -type f \( -name '*.ascii' -o -name '*.txt' \) 2>/dev/null)
+  (( ${#files[@]} )) || return 1
+  
+  cat "${files[@]}" 2>/dev/null | awk 'NF{print}' | shuf -n 1
+}
+
+flower_banner() {
+  [[ -x "$FLOWEROS_BIN/banner" ]] && "$FLOWEROS_BIN/banner" "$@" || echo "$*"
+}
+
+flower_animate() {
+  [[ -x "$FLOWEROS_BIN/animate" ]] && "$FLOWEROS_BIN/animate" "$FLOWEROS_ASCII/${1:-flower.anim}" "${2:-10}" "${3:-0}"
+}
+
+flower_fortune() {
+  [[ -x "$FLOWEROS_BIN/fortune" ]] && "$FLOWEROS_BIN/fortune" "$@" || flower_pick_ascii_line
+}
+
+flower_colortest() {
+  [[ -x "$FLOWEROS_BIN/colortest" ]] && "$FLOWEROS_BIN/colortest"
+}
+
+flower_visual() {
+  [[ -x "$FLOWEROS_BIN/visual" ]] && "$FLOWEROS_BIN/visual" "$@"
+}
+
+# ═══════════════════════════════════════════════════════════════════════════
+#  SHELL EXTRAS (aliases, watchers, dev-mode, fhelp)
+# ═══════════════════════════════════════════════════════════════════════════
+
+# Resolve lib/ relative to this file OR fall back to FLOWEROS_ROOT.
+_FLOWERRC_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+for _extras_candidate in \
+    "$_FLOWERRC_DIR/lib/shell_extras.sh" \
+    "${FLOWEROS_ROOT:-/opt/floweros}/lib/shell_extras.sh"; do
+  if [[ -f "$_extras_candidate" ]]; then
+    # shellcheck source=lib/shell_extras.sh
+    source "$_extras_candidate"
+    break
+  fi
+done
+unset _extras_candidate _FLOWERRC_DIR
+
+# ═══════════════════════════════════════════════════════════════════════════
+#  NETWORK & ADVANCED FEATURES (v1.3.X EXPERIMENTAL ONLY)
+# ═══════════════════════════════════════════════════════════════════════════
+# These features are NOT available in stable versions
+# Rooting.cpp / Rooter.hpp - Network routing capabilities (EXPERIMENTAL)
+# ═══════════════════════════════════════════════════════════════════════════
+
+flower_network_status() {
+  if [[ "$FLOWEROS_VERSION" == "1.3."* ]]; then
+    echo -e "\033[31m⚠️  EXPERIMENTAL: Network features only in v1.3.X\033[0m"
+    echo -e "\033[31m   This feature uses Rooter.hpp/Rooting.cpp (network routing)\033[0m"
+    echo -e "\033[31m   NOT SUPPORTED in stable releases\033[0m"
+    # Future: Check network routing status
+    return 1
+  else
+    echo -e "\033[33mNetwork features not available in stable v${FLOWEROS_VERSION}\033[0m"
+    echo -e "\033[33mUse simple functions and core customizations instead\033[0m"
+    return 1
+  fi
+}
+
+flower_remote_sync() {
+  if [[ "$FLOWEROS_VERSION" == "1.3."* ]]; then
+    echo -e "\033[31m⚠️  EXPERIMENTAL: Remote sync only in v1.3.X\033[0m"
+    echo -e "\033[31m   Network routing required (Rooter.hpp)\033[0m"
+    echo -e "\033[31m   NOT SUPPORTED in stable releases\033[0m"
+    return 1
+  else
+    echo -e "\033[33mRemote features not available in stable v${FLOWEROS_VERSION}\033[0m"
+    return 1
+  fi
+}
+
+flower_advanced_check() {
+  echo -e "\033[31m════════════════════════════════════════════════════════════════\033[0m"
+  echo -e "\033[31m  FlowerOS Advanced Features Status\033[0m"
+  echo -e "\033[31m════════════════════════════════════════════════════════════════\033[0m"
+  echo ""
+  echo "  Current Version: $FLOWEROS_VERSION"
+  echo "  Build Type: $FLOWEROS_BUILD_TYPE"
+  echo ""
+
+  if [[ "$FLOWEROS_VERSION" == "1.3."* ]]; then
+    echo -e "\033[31m  Status: EXPERIMENTAL DEVELOPMENT VERSION\033[0m"
+    echo ""
+    echo -e "\033[31m  Available Advanced Features (EXPERIMENTAL):\033[0m"
+    echo -e "\033[31m    • flower_network_status  - Network routing status\033[0m"
+    echo -e "\033[31m    • flower_remote_sync     - Remote synchronization\033[0m"
+    echo -e "\033[31m    • flower_gpu_status      - GPU detection & info\033[0m"
+    echo -e "\033[31m    • flower_gpu_batch       - GPU batch processing\033[0m"
+    echo -e "\033[31m    • Network routing via Rooter.hpp/Rooting.cpp\033[0m"
+    echo -e "\033[31m    • GPU acceleration for HPC workloads\033[0m"
+    echo ""
+    echo -e "\033[33m  ⚠️  WARNING: These features are NOT production-ready!\033[0m"
+    echo -e "\033[33m  FlowerOS isn't just an OS layer—it's for HPC too!\033[0m"
+  else
+    echo -e "\033[32m  Status: STABLE RELEASE\033[0m"
+    echo ""
+    echo "  Stable Features Available:"
+    echo "    • flower_pick_ascii_line"
+    echo "    • flower_banner"
+    echo "    • flower_animate"
+    echo "    • flower_fortune"
+    echo "    • flower_colortest"
+    echo "    • flower_visual"
+    echo ""
+    echo -e "\033[33m  Advanced features: NOT AVAILABLE\033[0m"
+    echo -e "\033[33m  (Prioritizing simple functions and core customizations)\033[0m"
+  fi
+
+  echo ""
+  echo -e "\033[31m════════════════════════════════════════════════════════════════\033[0m"
+}
+
+# ═══════════════════════════════════════════════════════════════════════════
+#  GPU BATCH PROCESSING (v1.3.X EXPERIMENTAL - HPC FEATURES)
+# ═══════════════════════════════════════════════════════════════════════════
+# FlowerOS isn't just an OS layer—it's for HPC!
+# Simple functions, GPU accelerated.
+# Hardware detection handled by special hardware layer (not FlowerOS core)
+# ═══════════════════════════════════════════════════════════════════════════
+
+flower_gpu_status() {
+  if [[ "$FLOWEROS_VERSION" == "1.3."* ]]; then
+    echo -e "\033[31m🔴 EXPERIMENTAL: GPU features only in v1.3.X\033[0m"
+    echo -e "\033[31m   FlowerOS isn't just an OS layer—it's for HPC!\033[0m"
+    echo ""
+
+    # Check if GPU detection binary exists (provided by hardware layer)
+    if [[ -x "$FLOWEROS_BIN/gpu-detect" ]]; then
+      "$FLOWEROS_BIN/gpu-detect" status
+    else
+      echo -e "\033[33m⚠️  GPU detection binary not found\033[0m"
+      echo "   Hardware detection handled by special hardware layer"
+      echo "   Install gpu-detect for full GPU support"
+      echo ""
+      echo -e "\033[90m   Mock status:\033[0m"
+      echo "   • GPU: Available (simulated)"
+      echo "   • Mode: CPU fallback"
+    fi
+    return 0
+  else
+    echo -e "\033[33mGPU features not available in stable v${FLOWEROS_VERSION}\033[0m"
+    echo -e "\033[33mUse simple CPU-based functions instead\033[0m"
+    return 1
+  fi
+}
+
+flower_gpu_info() {
+  if [[ "$FLOWEROS_VERSION" == "1.3."* ]]; then
+    echo -e "\033[31m🔴 EXPERIMENTAL: GPU batch processing\033[0m"
+    echo ""
+
+    if [[ -x "$FLOWEROS_BIN/gpu-detect" ]]; then
+      "$FLOWEROS_BIN/gpu-detect" info
+    else
+      echo "GPU Information:"
+      echo "  Hardware detection: Special hardware layer required"
+      echo "  Status: Not available"
+      echo ""
+      echo "Install gpu-detect for:"
+      echo "  • CUDA device detection"
+      echo "  • OpenCL platform enumeration"
+      echo "  • ROCm capability detection"
+      echo "  • Memory and compute info"
+    fi
+    return 0
+  else
+    echo -e "\033[33mGPU features not available in stable v${FLOWEROS_VERSION}\033[0m"
+    return 1
+  fi
+}
+
+flower_gpu_batch() {
+  local mode="$1"
+  shift
+
+  if [[ "$FLOWEROS_VERSION" != "1.3."* ]]; then
+    echo -e "\033[33mGPU batch processing not available in stable v${FLOWEROS_VERSION}\033[0m"
+    echo -e "\033[33mUse standard functions for simple, reliable processing\033[0m"
+    return 1
+  fi
+
+  echo -e "\033[31m🔴 EXPERIMENTAL: GPU batch processing\033[0m"
+  echo -e "\033[31m   Simple functions, GPU accelerated\033[0m"
+  echo ""
+
+  if [[ -z "$mode" ]]; then
+    echo "Usage: flower_gpu_batch <mode> [args]"
+    echo ""
+    echo "Available modes:"
+    echo "  ascii       - Generate ASCII art variations"
+    echo "  banner      - Generate banner variations"
+    echo "  colorize    - Apply color palettes to ASCII"
+    echo "  animate     - Render animation frames"
+    echo "  fortune     - Generate fortune cookies"
+    echo "  transform   - Transform ASCII art"
+    echo ""
+    echo "Example:"
+    echo "  flower_gpu_batch ascii 1000"
+    echo "  flower_gpu_batch banner \"FlowerOS\" 500 --styles all"
+    echo "  flower_gpu_batch colorize *.ascii --palette rainbow"
+    return 1
+  fi
+
+  # Check for GPU batch processor
+  if [[ -x "$FLOWEROS_BIN/gpu-batch" ]]; then
+    "$FLOWEROS_BIN/gpu-batch" "$mode" "$@"
+  else
+    echo -e "\033[33m⚠️  GPU batch processor not found\033[0m"
+    echo "   Falling back to CPU processing..."
+    echo ""
+    echo "   Install gpu-batch for:"
+    echo "   • 10-300x speedup over CPU"
+    echo "   • Parallel batch processing"
+    echo "   • HPC workload optimization"
+    echo ""
+    return 1
+  fi
+}
+
+# ═══════════════════════════════════════════════════════════════════════════
+#  ADVANCED FEATURES
+# ═══════════════════════════════════════════════════════════════════════════
+
+# ⚠️  WARNING: Network and Advanced Features (v1.3.X ONLY)
+# ═══════════════════════════════════════════════════════════════════════════
+# Network routing (Rooter.hpp/Rooting.cpp) and advanced features are 
+# EXPERIMENTAL and only available in v1.3.X development versions.
+#
+# STABLE VERSIONS prioritize:
+#   - Simple functions
+#   - Core customizations  
+#   - Reliability over features
+#
+# Advanced features (network, routing, remote operations) will be marked
+# in RED and are NOT supported in stable releases.
+# ═══════════════════════════════════════════════════════════════════════════
+
+# Display version warning if on v1.3.X
+if [[ "$FLOWEROS_VERSION" == "1.3."* ]]; then
+  if [[ $- == *i* ]] && [[ -z "$FLOWEROS_QUIET" ]]; then
+    echo -e "\033[31m⚠️  WARNING: FlowerOS v1.3.X Development Version\033[0m"
+    echo -e "\033[31m   Network and advanced features are EXPERIMENTAL\033[0m"
+    echo -e "\033[31m   Use stable v1.2.X for production environments\033[0m"
+    echo ""
+  fi
+fi
+
+# FlowerOS Welcome (if visual-experience is installed)
+if [[ -f "$FLOWEROS_LIB/FlowerOS-Welcome.sh" ]]; then
+  source "$FLOWEROS_LIB/FlowerOS-Welcome.sh"
+
+  # Auto-welcome on interactive shells
+  if [[ $- == *i* ]] && [[ -z "$FLOWEROS_QUIET" ]]; then
+    floweros_welcome auto 2>/dev/null || true
+  fi
+elif [[ $- == *i* ]] && [[ -z "$FLOWEROS_QUIET" ]]; then
+  # Fallback: Show random ASCII on new shell
+  flower_pick_ascii_line 2>/dev/null || true
+fi
+
+# ═══════════════════════════════════════════════════════════════════════════
+#  SYSTEM INTEGRATION
+# ═══════════════════════════════════════════════════════════════════════════
+
+# Aliases for convenience
+alias floweros-info='cat "$FLOWEROS_CONFIG/VERSION"'
+alias floweros-status='systemctl status floweros.service 2>/dev/null || echo "FlowerOS native integration active"'
+alias floweros-reload='source ~/.flowerrc && echo "FlowerOS reloaded"'
+
+# Completion (if available)
+[[ -f "$FLOWEROS_CONFIG/completion.bash" ]] && source "$FLOWEROS_CONFIG/completion.bash"
+
+# ═══════════════════════════════════════════════════════════════════════════
+#  SYSTEM MOTD Integration
+# ═══════════════════════════════════════════════════════════════════════════
+
+# Mark FlowerOS as active system component
+export FLOWEROS_SYSTEM_INTEGRATION="NATIVE"
+export FLOWEROS_VERSION="1.3.0"
+export FLOWEROS_BUILD_TYPE="${FLOWEROS_BUILD_TYPE:-PERMANENT_ROOT}"
+
+# ═══════════════════════════════════════════════════════════════════════════
+#  End FlowerOS Core System Integration
+#  This file is sourced automatically by /etc/bash.bashrc and user ~/.bashrc
+#  Installed: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+# ═══════════════════════════════════════════════════════════════════════════

@@ -1,0 +1,175 @@
+╔═══════════════════════════════════════════════════════════════════════════╗
+║                                                                           ║
+║               🪟 FLOWEROS BUDDY WINDOWS - QUICK REFERENCE 🪟              ║
+║                                                                           ║
+╚═══════════════════════════════════════════════════════════════════════════╝
+
+┌───────────────────────────────────────────────────────────────────────────┐
+│                          QUICK START                                      │
+└───────────────────────────────────────────────────────────────────────────┘
+
+  Fastest way to test relay:
+    $ bash relay-auto-test.sh
+
+  Opens 3 windows, press Ctrl+C to close all.
+
+┌───────────────────────────────────────────────────────────────────────────┐
+│                        MAIN COMMANDS                                      │
+└───────────────────────────────────────────────────────────────────────────┘
+
+  bash buddy-windows.sh open     Open 3-window relay test
+  bash buddy-windows.sh close    Close all buddy windows
+  bash buddy-windows.sh status   Show status of windows
+  
+  bash buddy-presets.sh          Interactive preset menu
+  bash relay-auto-test.sh        Auto relay test (Ctrl+C to exit)
+
+┌───────────────────────────────────────────────────────────────────────────┐
+│                          PRESETS                                          │
+└───────────────────────────────────────────────────────────────────────────┘
+
+  [1] Relay Test      3 windows  Master → Relay → Worker
+  [2] Cluster Test    4 windows  Master + 3 Workers (2x2 grid)
+  [3] Discovery Test  2 windows  Monitor + Discovery (side-by-side)
+  [4] GPU Cluster     3 windows  GPU testing setup
+  [5] Development     2 windows  Editor + Test terminal
+
+┌───────────────────────────────────────────────────────────────────────────┐
+│                         WINDOW LAYOUTS                                    │
+└───────────────────────────────────────────────────────────────────────────┘
+
+  Relay Test:
+    ┌─────────────┬─────────────┬─────────────┐
+    │   Master    │    Relay    │   Worker    │
+    │   :7777     │    :7778    │    :7779    │
+    └─────────────┴─────────────┴─────────────┘
+
+  Cluster Test:
+    ┌─────────────┬─────────────┐
+    │   Master    │  Worker-1   │
+    ├─────────────┼─────────────┤
+    │  Worker-2   │  Worker-3   │
+    └─────────────┴─────────────┘
+
+┌───────────────────────────────────────────────────────────────────────────┐
+│                       USAGE EXAMPLES                                      │
+└───────────────────────────────────────────────────────────────────────────┘
+
+  Quick relay test:
+    $ bash relay-auto-test.sh
+    [Watch 3 windows appear]
+    [Press Ctrl+C to close all]
+
+  Manual control:
+    $ bash buddy-windows.sh open
+    [Test network features]
+    $ bash buddy-windows.sh close
+
+  Choose preset:
+    $ bash buddy-presets.sh
+    [Choose option from menu]
+
+  Check if windows are open:
+    $ bash buddy-windows.sh status
+
+┌───────────────────────────────────────────────────────────────────────────┐
+│                      WHAT EACH WINDOW SHOWS                               │
+└───────────────────────────────────────────────────────────────────────────┘
+
+  Master Node (port 7777):
+    • Becomes TREE (coordinator)
+    • Broadcasts messages to network
+    • Shows outgoing traffic
+    • Displays connected nodes
+
+  Relay Node (port 7778):
+    • Joins master's network
+    • Receives and forwards messages
+    • Shows relay statistics
+    • Tracks hops and routing
+
+  Worker Node (port 7779):
+    • Joins master's network
+    • Receives relayed messages
+    • Shows incoming traffic
+    • Processes work requests
+
+┌───────────────────────────────────────────────────────────────────────────┐
+│                        TROUBLESHOOTING                                    │
+└───────────────────────────────────────────────────────────────────────────┘
+
+  No terminal emulator:
+    $ sudo apt-get install gnome-terminal
+
+  Windows won't close:
+    $ ps aux | grep node_monitor
+    $ kill <PID>
+    $ rm /tmp/floweros_buddy_windows.pid
+
+  Build errors:
+    $ cd network/ && make clean && make all && cd ..
+
+  Windows overlap:
+    Edit buddy-windows.sh and adjust --geometry positions
+
+┌───────────────────────────────────────────────────────────────────────────┐
+│                      SUPPORTED TERMINALS                                  │
+└───────────────────────────────────────────────────────────────────────────┘
+
+  ✓ gnome-terminal (GNOME)
+  ✓ konsole (KDE)
+  ✓ xterm (Universal)
+  ✓ xfce4-terminal (XFCE)
+  ✓ tilix (Tilix)
+
+  Auto-detects your terminal emulator.
+
+┌───────────────────────────────────────────────────────────────────────────┐
+│                           FILES                                           │
+└───────────────────────────────────────────────────────────────────────────┘
+
+  buddy-windows.sh      Core buddy window manager
+  relay-auto-test.sh    One-command relay test
+  buddy-presets.sh      Interactive preset menu
+  BUDDY_WINDOWS.md      Complete documentation
+
+┌───────────────────────────────────────────────────────────────────────────┐
+│                        KEYBOARD SHORTCUTS                                 │
+└───────────────────────────────────────────────────────────────────────────┘
+
+  In relay-auto-test.sh:
+    Ctrl+C    Close all windows and exit
+
+  In node_monitor windows:
+    Ctrl+C    Stop monitor (close window)
+
+  In buddy-presets.sh menu:
+    1-5       Choose preset
+    C         Close all windows
+    Q         Quit menu
+
+┌───────────────────────────────────────────────────────────────────────────┐
+│                          TIPS & TRICKS                                    │
+└───────────────────────────────────────────────────────────────────────────┘
+
+  1. Use relay-auto-test.sh for quickest testing
+  2. Use buddy-presets.sh to explore different setups
+  3. Adjust geometry in buddy-windows.sh for your screen
+  4. Check status before closing to see active windows
+  5. Use Development preset for coding + testing workflow
+
+┌───────────────────────────────────────────────────────────────────────────┐
+│                       🔴 EXPERIMENTAL WARNING                             │
+└───────────────────────────────────────────────────────────────────────────┘
+
+  Network features are EXPERIMENTAL (v1.3.X)
+  • Not production ready
+  • For testing and development only
+  • See RED_WARNING_SUMMARY.md
+
+═══════════════════════════════════════════════════════════════════════════
+
+                       🌱 Buddy Windows System 🌱
+                    Automated Multi-Terminal Testing
+
+═══════════════════════════════════════════════════════════════════════════

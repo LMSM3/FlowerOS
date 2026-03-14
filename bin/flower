@@ -1,0 +1,139 @@
+#!/usr/bin/env bash
+# ═══════════════════════════════════════════════════════════════════════════
+#  flower  --  FlowerOS command entry point
+#
+#  Usage:
+#    flower [--version|-v]   Show version and install date
+#    flower [--help|-h]      Show this message
+#    flower tree             Show installed file tree
+#
+#  Version file searched in priority order:
+#    $FLOWEROS_CONFIG/VERSION  (runtime export)
+#    ~/.floweros/VERSION        (user install)
+#    /etc/floweros/VERSION      (permanent install)
+# ═══════════════════════════════════════════════════════════════════════════
+
+set -uo pipefail
+
+readonly _F_MAG='\033[35m'
+readonly _F_CYN='\033[36m'
+readonly _F_GRN='\033[32m'
+readonly _F_YLW='\033[33m'
+readonly _F_BLD='\033[1m'
+readonly _F_RST='\033[0m'
+
+# ── Locate the VERSION file ──────────────────────────────────────────────
+_find_version_file() {
+  local candidates=(
+    "${FLOWEROS_CONFIG:-__none__}/VERSION"
+    "${HOME}/.floweros/VERSION"
+    "/etc/floweros/VERSION"
+    "${FLOWEROS_ROOT:-__none__}/VERSION"
+  )
+  for f in "${candidates[@]}"; do
+    [[ -f "$f" ]] && { printf '%s' "$f"; return 0; }
+  done
+  return 1
+}
+
+# ── Commands ─────────────────────────────────────────────────────────────
+_cmd_version() {
+  local vfile
+  echo ""
+  if vfile="$(_find_version_file)"; then
+    local ver build_type installed
+    ver="$(        grep '^FlowerOS '  "$vfile" | sed 's/^FlowerOS //')"
+    build_type="$( grep '^Build: '    "$vfile" | sed 's/^Build: //')"
+    installed="$(  grep '^Installed: ' "$vfile" | sed 's/^Installed: //')"
+    printf "${_F_MAG}${_F_BLD}FlowerOS${_F_RST}\n"
+    printf "  %-14s ${_F_GRN}%s${_F_RST}\n" "Version"   "${ver:-unknown}"
+    printf "  %-14s %s\n"                    "Build"     "${build_type:-unknown}"
+    printf "  %-14s %s\n"                    "Installed" "${installed:-unknown}"
+    printf "  %-14s ${_F_CYN}%s${_F_RST}\n" "Config"    "$vfile"
+  else
+    printf "${_F_MAG}${_F_BLD}FlowerOS${_F_RST}  ${_F_YLW}(VERSION file not found)${_F_RST}\n"
+    printf "  Expected: %s\n" "${HOME}/.floweros/VERSION  or  /etc/floweros/VERSION"
+  fi
+  echo ""
+}
+
+_cmd_help() {
+  echo ""
+  printf "${_F_MAG}${_F_BLD}flower${_F_RST} -- FlowerOS entry point\n"
+  echo ""
+  printf "  ${_F_CYN}%-28s${_F_RST} %s\n" "flower --version, -v"    "Show version and install date"
+  printf "  ${_F_CYN}%-28s${_F_RST} %s\n" "flower tree"             "Show installed file tree"
+  printf "  ${_F_CYN}%-28s${_F_RST} %s\n" "flower --help, -h"       "Show this message"
+  echo ""
+  printf "  ${_F_CYN}%-28s${_F_RST} %s\n" "floweros --version"      "Alias for flower --version"
+  echo ""
+}
+
+_cmd_tree() {
+  local root="${FLOWEROS_ROOT:-${HOME}/FlowerOS}"
+  echo ""
+  printf "${_F_MAG}%s${_F_RST}\n" \
+    "===============================================================================" \
+    "  FlowerOS -- Installed Layout" \
+    "==============================================================================="
+  echo ""
+
+  if [[ ! -d "$root" ]]; then
+    printf "  Install root not found: %s\n" "$root"
+    echo ""
+    return 0
+  fi
+
+  printf "  Root   : %s\n" "$root"
+  printf "  Config : %s\n" "${FLOWEROS_CONFIG:-${HOME}/.floweros}"
+  echo ""
+
+  # bin/
+  if [[ -d "$root/bin" ]]; then
+    printf "  bin/\n"
+    for f in "$root/bin"/*; do
+      [[ -e "$f" ]] && printf "    %-24s %s\n" "$(basename "$f")" "$(du -h "$f" 2>/dev/null | cut -f1)"
+    done
+    echo ""
+  fi
+
+  # lib/
+  if [[ -d "$root/lib" ]]; then
+    local lib_count
+    lib_count=$(find "$root/lib" -type f 2>/dev/null | wc -l)
+    printf "  lib/               (%d files)\n" "$lib_count"
+    echo ""
+  fi
+
+  # ascii/
+  if [[ -d "$root/ascii" ]]; then
+    local asc_count
+    asc_count=$(find "$root/ascii" -type f 2>/dev/null | wc -l)
+    printf "  ascii/             (%d files)\n" "$asc_count"
+    echo ""
+  fi
+
+  # VERSION
+  local vfile
+  if vfile="$(_find_version_file)"; then
+    printf "  VERSION            %s\n" "$vfile"
+  fi
+
+  echo ""
+  printf "${_F_MAG}%s${_F_RST}\n" \
+    "==============================================================================="
+  echo ""
+}
+
+# ── Dispatch ──────────────────────────────────────────────────────────────
+case "${1:-}" in
+  --version|-v|version)  _cmd_version ;;
+  --help|-h|help)        _cmd_help ;;
+  tree)                  _cmd_tree ;;
+  "")                    _cmd_version ;;
+  *)
+    printf "flower: unknown command '%s'\n\n" "$1" >&2
+    _cmd_help
+    exit 1
+    ;;
+esac

@@ -1,0 +1,9 @@
+# This directory is for temporary files
+
+*.log
+*.tmp
+*.temp
+*.bak
+
+# Keep directory in git
+!.gitkeep

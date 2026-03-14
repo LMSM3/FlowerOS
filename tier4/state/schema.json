@@ -1,0 +1,90 @@
+{
+  "$id": "floweros-state-v1",
+  "type": "object",
+  "required": ["version", "tier", "system", "drives", "shell", "features", "floweros"],
+  "properties": {
+    "version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+    "tier": { "type": "integer", "enum": [1, 2, 3, 4, 5] },
+    "install_id": { "type": ["string", "null"], "format": "uuid" },
+    "installed_at": { "type": ["string", "null"], "format": "date-time" },
+
+    "system": {
+      "type": "object",
+      "properties": {
+        "USER":     { "type": ["string", "null"] },
+        "DESKTOP":  { "type": ["string", "null"] },
+        "HOME":     { "type": ["string", "null"] },
+        "HOSTNAME": { "type": ["string", "null"] }
+      },
+      "required": ["USER", "DESKTOP", "HOME", "HOSTNAME"]
+    },
+
+    "drives": {
+      "type": "object",
+      "properties": {
+        "DRIVE_LIST": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "letter":     { "type": "string", "pattern": "^[A-Z]:$" },
+              "label":      { "type": ["string", "null"] },
+              "type":       { "type": "string", "enum": ["fixed", "removable", "network", "optical", "ram"] },
+              "filesystem": { "type": ["string", "null"] },
+              "total_gb":   { "type": ["number", "null"] },
+              "free_gb":    { "type": ["number", "null"] }
+            },
+            "required": ["letter", "type"]
+          }
+        },
+        "primary": { "type": ["string", "null"], "pattern": "^[A-Z]:$" }
+      },
+      "required": ["DRIVE_LIST", "primary"]
+    },
+
+    "shell": {
+      "type": "object",
+      "properties": {
+        "DEFAULT_SHELL": { "type": ["string", "null"] },
+        "TERMINAL_PROFILES": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name":   { "type": "string" },
+              "exe":    { "type": "string" },
+              "args":   { "type": ["string", "null"] },
+              "active": { "type": "boolean" }
+            },
+            "required": ["name", "exe"]
+          }
+        }
+      },
+      "required": ["DEFAULT_SHELL", "TERMINAL_PROFILES"]
+    },
+
+    "features": {
+      "type": "object",
+      "properties": {
+        "gpu_enabled":     { "type": "boolean" },
+        "network_enabled": { "type": "boolean" },
+        "theme":           { "type": "string" },
+        "quiet_mode":      { "type": "boolean" }
+      },
+      "required": ["gpu_enabled", "network_enabled", "theme", "quiet_mode"]
+    },
+
+    "floweros": {
+      "type": "object",
+      "properties": {
+        "FLOWEROS_VERSION": { "type": "string" },
+        "TIER":             { "type": "integer" },
+        "INSTALL_ID":       { "type": ["string", "null"] },
+        "root_path":        { "type": ["string", "null"] },
+        "state_path":       { "type": ["string", "null"] },
+        "pipe_name":        { "type": "string" }
+      },
+      "required": ["FLOWEROS_VERSION", "TIER", "pipe_name"]
+    }
+  }
+}

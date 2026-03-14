@@ -1,0 +1,91 @@
+FlowerOS MOTD - ASCII Art Index
+Generated: 2026-01-24 18:18:20
+
+Available ASCII Art Files:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+01:
+  - 01-small.ascii (60 cols)
+  - 01-medium.ascii (120 cols)
+  - 01-large.ascii (160 cols)
+  - 01-hash.ascii (hash mode)
+
+02:
+  - 02-small.ascii (60 cols)
+  - 02-medium.ascii (120 cols)
+  - 02-large.ascii (160 cols)
+  - 02-hash.ascii (hash mode)
+
+03:
+  - 03-small.ascii (60 cols)
+  - 03-medium.ascii (120 cols)
+  - 03-large.ascii (160 cols)
+  - 03-hash.ascii (hash mode)
+
+04:
+  - 04-small.ascii (60 cols)
+  - 04-medium.ascii (120 cols)
+  - 04-large.ascii (160 cols)
+  - 04-hash.ascii (hash mode)
+
+05:
+  - 05-small.ascii (60 cols)
+  - 05-medium.ascii (120 cols)
+  - 05-large.ascii (160 cols)
+  - 05-hash.ascii (hash mode)
+
+06:
+  - 06-small.ascii (60 cols)
+  - 06-medium.ascii (120 cols)
+  - 06-large.ascii (160 cols)
+  - 06-hash.ascii (hash mode)
+
+07:
+  - 07-small.ascii (60 cols)
+  - 07-medium.ascii (120 cols)
+  - 07-large.ascii (160 cols)
+  - 07-hash.ascii (hash mode)
+
+08:
+  - 08-small.ascii (60 cols)
+  - 08-medium.ascii (120 cols)
+  - 08-large.ascii (160 cols)
+  - 08-hash.ascii (hash mode)
+
+09:
+  - 09-small.ascii (60 cols)
+  - 09-medium.ascii (120 cols)
+  - 09-large.ascii (160 cols)
+  - 09-hash.ascii (hash mode)
+
+10:
+  - 10-small.ascii (60 cols)
+  - 10-medium.ascii (120 cols)
+  - 10-large.ascii (160 cols)
+  - 10-hash.ascii (hash mode)
+
+11:
+  - 11-small.ascii (60 cols)
+  - 11-medium.ascii (120 cols)
+  - 11-large.ascii (160 cols)
+  - 11-hash.ascii (hash mode)
+
+12:
+  - 12-small.ascii (60 cols)
+  - 12-medium.ascii (120 cols)
+  - 12-large.ascii (160 cols)
+  - 12-hash.ascii (hash mode)
+
+
+Usage:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+View ASCII art:
+  cat motd/ascii-output/yourfile.ascii
+
+Use in welcome screen:
+  cp motd/ascii-output/yourfile.ascii features/v1.2/visual-experience/ascii/
+
+Preview all:
+  for f in motd/ascii-output/*.ascii; do echo "=== $f ==="; cat "$f"; echo ""; done
+

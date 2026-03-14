@@ -1,0 +1,81 @@
+{
+    "//": "FlowerOS VS Code Terminal Configuration",
+    "//": "Add these to your VS Code settings.json",
+    
+    "terminal.integrated.fontFamily": "CaskaydiaCove Nerd Font, Consolas, 'Courier New', monospace",
+    "terminal.integrated.fontSize": 12,
+    "terminal.integrated.fontWeight": "normal",
+    "terminal.integrated.fontWeightBold": "bold",
+    
+    "terminal.integrated.cursorBlinking": true,
+    "terminal.integrated.cursorStyle": "line",
+    "terminal.integrated.cursorWidth": 2,
+    
+    "terminal.integrated.minimumContrastRatio": 4.5,
+    "terminal.integrated.smoothScrolling": true,
+    "terminal.integrated.fastScrollSensitivity": 5,
+    
+    "terminal.integrated.gpuAcceleration": "on",
+    
+    "terminal.integrated.tabs.enabled": true,
+    "terminal.integrated.tabs.showActions": "always",
+    "terminal.integrated.tabs.showActiveTerminal": "always",
+    
+    "terminal.integrated.defaultProfile.windows": "PowerShell",
+    "terminal.integrated.defaultProfile.linux": "bash",
+    
+    "terminal.integrated.profiles.windows": {
+        "PowerShell FlowerOS": {
+            "source": "PowerShell",
+            "icon": "terminal-powershell",
+            "args": ["-NoLogo"]
+        },
+        "Bash FlowerOS (WSL)": {
+            "path": "C:\\Windows\\System32\\wsl.exe",
+            "icon": "terminal-linux",
+            "args": []
+        }
+    },
+    
+    "workbench.colorCustomizations": {
+        "[Default Dark+]": {
+            "terminal.background": "#1E1E1EF0",
+            "terminal.foreground": "#CCCCCC",
+            "terminal.ansiBlack": "#000000",
+            "terminal.ansiRed": "#CD3131",
+            "terminal.ansiGreen": "#0DBC79",
+            "terminal.ansiYellow": "#E5E510",
+            "terminal.ansiBlue": "#2472C8",
+            "terminal.ansiMagenta": "#BC3FBC",
+            "terminal.ansiCyan": "#11A8CD",
+            "terminal.ansiWhite": "#E5E5E5",
+            "terminal.ansiBrightBlack": "#666666",
+            "terminal.ansiBrightRed": "#F14C4C",
+            "terminal.ansiBrightGreen": "#23D18B",
+            "terminal.ansiBrightYellow": "#F5F543",
+            "terminal.ansiBrightBlue": "#3B8EEA",
+            "terminal.ansiBrightMagenta": "#D670D6",
+            "terminal.ansiBrightCyan": "#29B8DB",
+            "terminal.ansiBrightWhite": "#E5E5E5"
+        },
+        "[Dracula]": {
+            "terminal.background": "#282A36",
+            "terminal.foreground": "#F8F8F2"
+        },
+        "[Tokyo Night]": {
+            "terminal.background": "#1A1B26",
+            "terminal.foreground": "#C0CAF5"
+        }
+    },
+    
+    "//": "Optional: Background image for terminal",
+    "terminal.integrated.env.windows": {
+        "TERM": "xterm-256color"
+    },
+    
+    "//": "Recommended extensions for best experience",
+    "//": "  - Dracula Official",
+    "//": "  - Tokyo Night",
+    "//": "  - Material Icon Theme",
+    "//": "  - Better Comments"
+}

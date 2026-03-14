@@ -1,0 +1,40 @@
+{
+  "$schema": "./schema.json",
+  "version": "1.3.0",
+  "tier": 4,
+  "install_id": null,
+  "installed_at": null,
+
+  "system": {
+    "USER": null,
+    "DESKTOP": null,
+    "HOME": null,
+    "HOSTNAME": null
+  },
+
+  "drives": {
+    "DRIVE_LIST": [],
+    "primary": null
+  },
+
+  "shell": {
+    "DEFAULT_SHELL": null,
+    "TERMINAL_PROFILES": []
+  },
+
+  "features": {
+    "gpu_enabled": false,
+    "network_enabled": false,
+    "theme": "botanical",
+    "quiet_mode": false
+  },
+
+  "floweros": {
+    "FLOWEROS_VERSION": "1.3.0",
+    "TIER": 4,
+    "INSTALL_ID": null,
+    "root_path": null,
+    "state_path": null,
+    "pipe_name": "\\\\.\\pipe\\floweros\\comm"
+  }
+}
