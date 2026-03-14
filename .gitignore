@@ -35,3 +35,17 @@ Thumbs.db
 
 # FlowerOS local state (not repo content)
 auth
+
+# Temporary / scratch directories
+ICONS_TEMP/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Scratch / editor leftovers
+*.new
+*.tmp
+*.bak
+*.backup
