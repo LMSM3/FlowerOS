@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# ═══════════════════════════════════════════════════════════════════════════
+#  floweros  --  Alias entry point (forwards to bin/flower)
+#
+#  floweros --version   ⟹  flower --version
+#  floweros --tree      ⟹  flower --tree
+#  floweros --help      ⟹  flower --help
+# ═══════════════════════════════════════════════════════════════════════════
+
+_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+exec "$_DIR/flower" "$@"

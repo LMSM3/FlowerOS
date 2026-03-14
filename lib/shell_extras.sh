@@ -57,7 +57,7 @@ alias fanimate='flower_animate'
 
 # ── System ──
 alias freload='source ~/.flowerrc && echo "✿ FlowerOS reloaded"'
-alias fversion='echo "FlowerOS ${FLOWEROS_VERSION:-?}"'
+alias fversion='flower --version'
 alias fconfig='${EDITOR:-nano} "${HOME}/.floweros/preferences.conf"'
 
 # ═══════════════════════════════════════════════════════════════════════════

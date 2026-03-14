@@ -21,9 +21,9 @@
 
 FlowerOS is a terminal-first shell environment designed to make local development, document publishing, system orchestration, and themed interaction feel structured rather than improvised. It is not a kernel replacement. It is a layered shell ecosystem: a shared install engine, runtime helpers, themed output conventions, utility frontends, and environment scaffolding assembled into a single coherent layer.
 
-The current implementation (Tier 5, v1.3.x) runs on Linux and WSL2. The long-term architecture targets a five-tier model spanning bare-metal Linux, kernel wrapping, WSL sandboxing, Windows IPC coordination, and the current power-user Linux layer. Each tier is a distinct deployment model, not a replacement for the one before it.
+The current implementation (Tier 5, v1.2.5.x) runs on Linux and WSL2.
 
-**What ships in v1.3.0:**
+**What ships in v1.2.5.1:**
 - **Shared install engine** (`lib/install-core.sh`) — unified build, deploy, inject, download, auth, and remove logic shared across all install modes
 - **Universal language runner** (`flower-run`) — auto-detects and runs C, C++, CUDA, Python, Julia, Rust, Go, Fortran, and more with optional HPC and GPU flags
 - **Publishing workflow** (`fp`) — LaTeX document tool: `new`, `edit`, `build`, `view`, `watch`, `deps`
@@ -123,7 +123,7 @@ FlowerOS is organized as a layered shell environment. Each tier is a distinct de
 | 2 | Existing Linux | Base kernel wrapper — intercept and enhance | Prototype (`src/kernel/`) |
 | 3 | WSL safe mode | User sandbox + experimental desktop window | Partial |
 | 4 | Windows native | Persistent state store + named-pipe IPC bus | Scaffolded (`tier4/`) |
-| 5 | Linux / WSL | **Current implementation** — tools, themes, network, GPU | **Active** (v1.3.x) |
+| 5 | Linux / WSL | **Current implementation** — tools, themes, network, GPU | **Active** (v1.2.5.x) |
 
 ### Tier 4 — Windows Substrate
 
@@ -163,7 +163,7 @@ FlowerOS/
 │   ├── runner/                 flower-run — universal language runner
 │   ├── games/                  Chess, colony, tower defense, launcher
 │   ├── tools/                  flower-todo
-│   ├── network/                Terminal network layer (v1.3.x, experimental)
+│   ├── network/                Terminal network layer (experimental)
 │   ├── kernel/                 Tier 2 kernel wrapper prototype
 │   └── tier4/                  Windows IPC broker (broker.c / broker.h)
 │
@@ -235,10 +235,11 @@ The user knows exactly what was installed, where it lives, and how to remove eve
 | v1.0 | Initial user-mode install, ASCII utilities, `.flowerrc` grafting |
 | v1.1 | Theming engine, PowerShell integration, feature modules |
 | v1.2.x | **Stable** — games suite, `flower-run`, `fp`, core customization |
-| **v1.3.0** | **Current** — shared install engine, permanent install mode, network layer, MOTD providers, Tier 4 scaffolding |
-| v1.4+ | Planned — Flower AI subsystem, Tier 4 IPC broker, cross-platform state sync, expanded runner, package update handling |
+| v1.2.x | Stable — games suite, `flower-run`, `fp`, core customization |
+| **v1.2.5.1** | **Current** — shared install engine, permanent install, network layer, MOTD providers, Tier 4 scaffolding, Flower AI subsystem (optional) |
+| v1.3+ | Planned — Tier 4 IPC broker, cross-platform state sync, expanded runner, package update handling |
 
-> **Stability note:** v1.2.x is the recommended stable branch for daily use. v1.3.x includes the network routing layer (`src/network/Rooter.hpp` / `Rooting.cpp`) which is explicitly experimental. All experimental output in v1.3.x is printed in red in the terminal.
+> **Stability note:** v1.2.5.x is the current stable branch. The network routing layer (`src/network/`) is explicitly experimental. All experimental output is printed in red in the terminal.
 
 ---
 
@@ -264,13 +265,12 @@ The user knows exactly what was installed, where it lives, and how to remove eve
 - MOTD and themed startup behavior
 - Script-based install and clean removal
 
-**Experimental in v1.3.x:**
+**Experimental in v1.2.5.x:**
 - Network routing layer (`src/network/`)
 - Permanent system-level install mode
 - Tier 4 IPC broker and Windows state store
 
 **Planned:**
-- Flower AI — optional local desktop inference subsystem (`lib/flower_ai/`)
 - Full Tier 4 IPC implementation (`tier4/broker.c` → production)
 - Tier 3 WSL desktop window
 - Remote and node-aware execution flows

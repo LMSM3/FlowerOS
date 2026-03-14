@@ -37,7 +37,7 @@
 //  Version
 // ─────────────────────────────────────────────────────────────────────────
 
-#define FLOWEROS_VERSION        "1.3.0"
+#define FLOWEROS_VERSION        "1.2.5.1"
 #define FLOWEROS_STATE_DIR      ".floweros"          // under $HOME
 #define FLOWEROS_PREFS_FILE     "preferences.conf"
 #define FLOWEROS_INSTALL_DIR    "FlowerOS"           // under $HOME

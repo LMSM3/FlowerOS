@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ═══════════════════════════════════════════════════════════════════════════
-#  FlowerOS Core System Integration v1.3.0
+#  FlowerOS Core System Integration v1.2.5.1
 #
 #  Sourced by ~/.bashrc (user mode) or /etc/bash.bashrc (permanent mode).
 #  Paths are set by the installer via FLOWEROS_ROOT before this file loads;
@@ -313,7 +313,8 @@ fi
 # ═══════════════════════════════════════════════════════════════════════════
 
 # Aliases for convenience
-alias floweros-info='cat "$FLOWEROS_CONFIG/VERSION"'
+alias floweros='flower'
+alias floweros-info='flower --version'
 alias floweros-status='systemctl status floweros.service 2>/dev/null || echo "FlowerOS native integration active"'
 alias floweros-reload='source ~/.flowerrc && echo "FlowerOS reloaded"'
 
@@ -326,7 +327,7 @@ alias floweros-reload='source ~/.flowerrc && echo "FlowerOS reloaded"'
 
 # Mark FlowerOS as active system component
 export FLOWEROS_SYSTEM_INTEGRATION="NATIVE"
-export FLOWEROS_VERSION="1.3.0"
+export FLOWEROS_VERSION="1.2.5.1"
 export FLOWEROS_BUILD_TYPE="${FLOWEROS_BUILD_TYPE:-PERMANENT_ROOT}"
 
 # ═══════════════════════════════════════════════════════════════════════════

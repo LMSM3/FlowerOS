@@ -24,6 +24,7 @@ _FOS_INSTALL_CORE=1
 
 # ── Source shared colors ──────────────────────────────────────────────────
 _FOS_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+_FOS_REPO_ROOT="$(cd "$_FOS_LIB_DIR/.." 2>/dev/null && pwd)"
 if [[ -f "$_FOS_LIB_DIR/colors.sh" ]]; then
   source "$_FOS_LIB_DIR/colors.sh"
 else
@@ -313,11 +314,11 @@ fos_verify_checksum() {
 # Download a versioned FlowerOS release tarball, verify, and extract.
 #   fos_fetch_release <version> <dest_dir> [sha256]
 #
-#   version  — e.g. "v1.3.0"
-#   dest_dir — directory to extract into (created if absent)
-#   sha256   — optional expected checksum
+#   version  — e.g. "v1.2.5.1"
+  #   dest_dir — directory to extract into (created if absent)
+  #   sha256   — optional expected checksum
 fos_fetch_release() {
-  local version="${1:-v1.3.0}"
+  local version="${1:-v1.2.5.1}"
   local dest_dir="$2"
   local checksum="${3:-}"
 
@@ -570,8 +571,11 @@ fos_remove_bashrc_block() {
 fos_write_version() {
   local target_file="$1"
   local build_type="${2:-user}"
+  # Read version from repo VERSION file (single source of truth)
+  local _fos_ver
+  _fos_ver="$(cat "${_FOS_REPO_ROOT:-.}/VERSION" 2>/dev/null || echo "unknown")"
   cat > "$target_file" <<EOF
-FlowerOS v1.3.0
+FlowerOS v${_fos_ver}
 Build: ${build_type}
 Installed: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
 EOF
