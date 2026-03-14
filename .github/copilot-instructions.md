@@ -9,3 +9,6 @@
 - **Protection:** ACLs + DPAPI for real security. Obscurity is annoyance only, never relied on.
 - **Clients:** PowerShell, bash, exe tools all talk to broker. Everything (themes, GPU, network) is a client of this substrate.
 - **Code lives in:** `tier4/` — broker.c, broker.h, client.ps1, state/
+
+## Python Script Guidelines
+- Write Python scripts only if they are reusable and will be used at least twice. Avoid creating one-off Python scripts just to perform a single task (e.g., writing a file).

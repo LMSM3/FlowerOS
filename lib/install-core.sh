@@ -1,22 +1,22 @@
 #!/usr/bin/env bash
 # ╔══════════════════════════════════════════════════════════════════════════╗
-# ║  lib/install-core.sh  —  FlowerOS Installation Engine                   ║
+# ║  lib/install-core.sh  —  FlowerOS Installation Engine                    ║
 # ║                                                                          ║
-# ║  Sourced by:  install.sh · install-permanent.sh                         ║
-# ║               uninstall.sh · remove-permanent.sh                        ║
+# ║  Sourced by:  install.sh · install-permanent.sh                          ║
+# ║               uninstall.sh · remove-permanent.sh                         ║ 
 # ║                                                                          ║
 # ║  Sections:                                                               ║
-# ║    I.    Presentation   fos_draw_header, fos_stage, fos_progress_bar    ║
-# ║    II.   Sentinels      FOS_MARKER_BEGIN / FOS_MARKER_END               ║
-# ║    III.  Manifests      FOS_CORE_BINS[], FOS_CORE_SRCS[]                ║
-# ║    IV.   Build          fos_build_core, fos_install_core_bins           ║
-# ║    V.    Assets         fos_copy_assets, fos_copy_libs                  ║
-# ║    VI.   Network        fos_download, fos_verify_checksum               ║
-# ║    VII.  Auth           fos_auth_prompt, fos_auth_check                 ║
-# ║    VIII. Bashrc         fos_inject_bashrc, fos_remove_bashrc_block      ║
-# ║    IX.   Version        fos_write_version                               ║
+# ║    I.    Presentation   fos_draw_header, fos_stage, fos_progress_bar     ║
+# ║    II.   Sentinels      FOS_MARKER_BEGIN / FOS_MARKER_END                ║
+# ║    III.  Manifests      FOS_CORE_BINS[], FOS_CORE_SRCS[]                 ║
+# ║    IV.   Build          fos_build_core, fos_install_core_bins            ║
+# ║    V.    Assets         fos_copy_assets, fos_copy_libs                   ║
+# ║    VI.   Network        fos_download, fos_verify_checksum                ║
+# ║    VII.  Auth           fos_auth_prompt, fos_auth_check                  ║
+# ║    VIII. Bashrc         fos_inject_bashrc, fos_remove_bashrc_block       ║
+# ║    IX.   Version        fos_write_version                                ║
 # ║                                                                          ║
-# ║  Architecture:  acquire  →  verify  →  build  →  graft  →  bloom       ║
+# ║  Architecture:  acquire  →  verify  →  build  →  graft  →  bloom         ║
 # ╚══════════════════════════════════════════════════════════════════════════╝
 
 [[ -n "${_FOS_INSTALL_CORE:-}" ]] && return 0

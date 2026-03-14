@@ -49,3 +49,6 @@ __pycache__/
 *.tmp
 *.bak
 *.backup
+
+/flower-todo
+/show-motd

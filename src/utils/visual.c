@@ -2,7 +2,7 @@
 // Real-time visualization after batch calculations
 // build: gcc -O2 -std=c11 -Wall -Wextra -o visual visual.c
 
-#define _POSIX_C_SOURCE 200809L
+#define _DEFAULT_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
