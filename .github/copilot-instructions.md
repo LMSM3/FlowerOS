@@ -12,3 +12,13 @@
 
 ## Python Script Guidelines
 - Write Python scripts only if they are reusable and will be used at least twice. Avoid creating one-off Python scripts just to perform a single task (e.g., writing a file).
+
+## Flower AI Subsystem
+- Flower AI is an **optional** local desktop inference subsystem. It is NOT mandatory for base FlowerOS operation.
+- **Architecture:** All AI code lives in `lib/flower_ai/`. The rest of FlowerOS talks only to `flower_ai.h`. No vendor headers, no backend types, no model formats leak outside that directory.
+- **Build isolation:** `FLOWER_ENABLE_AI=0` removes it entirely. If AI is absent, FlowerOS still boots, commands still work, AI commands display a clean notice. No crashes.
+- **Backend firewall:** `flower_ai_backend.cpp` is the only file that touches vendor/upstream libraries. Do not let raw backend calls spread across the codebase.
+- **Hardware tiers:** Tier A (desktop GPU, ≥8GB VRAM), Tier B (laptop/midrange), Tier C (CPU fallback). Auto-detected, graceful degradation.
+- **Task modes:** assistant, shell, code, report, summarize, analyze. Not just chat.
+- **Vendor target:** BitNet (Microsoft) via `vendors/`. Version-pinned, replaceable.
+- **Policy:** Optional at build time, optional at runtime, isolated behind one API, version-pinned, replaceable later.

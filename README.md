@@ -173,7 +173,12 @@ FlowerOS/
 │   ├── shell_extras.sh         Aliases, watchers, dev-mode gate, fhelp
 │   ├── run.sh                  Shell twin of flower-run (frun / frun_hpc)
 │   ├── theme_loader.sh         Theme loading and palette management
-│   └── post-install.sh         Optional post-install setup prompts
+│   ├── post-install.sh         Optional post-install setup prompts
+│   └── flower_ai/              Optional local AI subsystem
+│       ├── include/flower_ai.h Public API (only interface to rest of FlowerOS)
+│       ├── src/                Core, backend, detection, session
+│       ├── vendors/            Upstream inference libraries (not checked in)
+│       └── Makefile            Optional build with feature flags
 │
 ├── share/motd/                 MOTD system
 │   ├── flower-motd.sh          Main MOTD script
@@ -215,6 +220,9 @@ Consistent color, spacing, and output formatting improve scan speed and orientat
 **Extension without collapse**
 New tools slot into the existing architecture without touching unrelated parts. New binaries go in `src/`, new shell functions go in `lib/`, new MOTD data goes in `share/motd/inject.d/`.
 
+**Optional layers stay optional**
+Flower AI is an optional local desktop assistant subsystem. `FLOWER_ENABLE_AI=0` removes it entirely. If AI is absent, FlowerOS still boots, commands still work, AI commands display a clean notice. No crashes, no fake promises.
+
 **Local control matters**
 The user knows exactly what was installed, where it lives, and how to remove every trace of it cleanly.
 
@@ -228,7 +236,7 @@ The user knows exactly what was installed, where it lives, and how to remove eve
 | v1.1 | Theming engine, PowerShell integration, feature modules |
 | v1.2.x | **Stable** — games suite, `flower-run`, `fp`, core customization |
 | **v1.3.0** | **Current** — shared install engine, permanent install mode, network layer, MOTD providers, Tier 4 scaffolding |
-| v1.4+ | Planned — Tier 4 IPC broker, cross-platform state sync, expanded runner, package update handling |
+| v1.4+ | Planned — Flower AI subsystem, Tier 4 IPC broker, cross-platform state sync, expanded runner, package update handling |
 
 > **Stability note:** v1.2.x is the recommended stable branch for daily use. v1.3.x includes the network routing layer (`src/network/Rooter.hpp` / `Rooting.cpp`) which is explicitly experimental. All experimental output in v1.3.x is printed in red in the terminal.
 
@@ -262,6 +270,7 @@ The user knows exactly what was installed, where it lives, and how to remove eve
 - Tier 4 IPC broker and Windows state store
 
 **Planned:**
+- Flower AI — optional local desktop inference subsystem (`lib/flower_ai/`)
 - Full Tier 4 IPC implementation (`tier4/broker.c` → production)
 - Tier 3 WSL desktop window
 - Remote and node-aware execution flows

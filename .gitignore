@@ -9,6 +9,7 @@
 *.exe
 *.out
 *.dSYM/
+*.a
 
 # Core binaries (built by build.sh)
 /random
@@ -25,6 +26,22 @@
 /flower-colony
 /flower-td
 /flower-play
+
+# Compiled binaries in src/ (built by src/Makefile)
+src/flower-install
+src/flower-uninstall
+src/flower-postinstall
+src/flower-config
+src/flower-motd
+src/flower-todo
+src/flower-guy
+src/flower-walk
+src/flower-run
+src/flower-chess
+src/flower-colony
+src/flower-td
+src/flower-play
+src/fp
 
 # OS / editor junk
 .DS_Store
