@@ -84,6 +84,9 @@ _cmd_help() {
   printf "  ${_F_CYN}%-28s${_F_RST} %s\n" "flower --tree, tree"     "Show installed file tree"
   printf "  ${_F_CYN}%-28s${_F_RST} %s\n" "flower --help, -h"       "Show this message"
   echo ""
+  printf "  ${_F_CYN}%-28s${_F_RST} %s\n" "flower-theme-sync"       "Sync colours across bash + PowerShell"
+  printf "  ${_F_CYN}%-28s${_F_RST} %s\n" "fidentify"               "Quick-summon plant identifier"
+  echo ""
   printf "  ${_F_CYN}%-28s${_F_RST} %s\n" "floweros [any flag]"     "Same as flower (alias)"
   echo ""
 }

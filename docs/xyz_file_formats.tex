@@ -1,0 +1,1217 @@
+% ════════════════════════════════════════════════════════════════════════════
+%  Formation Engine — XYZ File Formats (Edition 2)
+%  VSEPR-SIM 3.0.0
+%  Formats: .xyz  .xyza  .xyzc  .xyzf
+%  Printer-ready LaTeX.  Compile with pdflatex (twice for refs).
+% ════════════════════════════════════════════════════════════════════════════
+\documentclass[12pt, a4paper, oneside]{article}
+
+% ── Geometry ────────────────────────────────────────────────────────────────
+\usepackage[
+  top=1.0in, bottom=1.0in, left=1.15in, right=1.15in,
+  headheight=14pt
+]{geometry}
+
+% ── Fonts / encoding ───────────────────────────────────────────────────────
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+% (microtype omitted: requires scalable fonts)
+
+% ── Math ───────────────────────────────────────────────────────────────────
+\usepackage{amsmath, amssymb, mathtools}
+
+% ── Tables ─────────────────────────────────────────────────────────────────
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{tabularx}
+
+% ── Lists ──────────────────────────────────────────────────────────────────
+\usepackage{enumitem}
+\setlist{nosep, leftmargin=1.5em}
+
+% ── Code ───────────────────────────────────────────────────────────────────
+\usepackage{listings}
+\usepackage{xcolor}
+
+\lstset{
+  basicstyle=\ttfamily\small,
+  keywordstyle=\color{blue},
+  commentstyle=\color{gray},
+  stringstyle=\color{red},
+  breaklines=true,
+  columns=fullflexible,
+  keepspaces=true,
+  frame=single,
+  backgroundcolor=\color{gray!8},
+  xleftmargin=0.5em,
+  xrightmargin=0.5em,
+  language=C++
+}
+
+% ── Graphics ───────────────────────────────────────────────────────────────
+\usepackage{graphicx}
+
+% ── Headers / footers ─────────────────────────────────────────────────────
+\usepackage{fancyhdr}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\textit{Formation Engine Methodology}}
+\fancyhead[R]{\small\textit{XYZ File Formats --- Edition 2}}
+\fancyfoot[C]{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+% ── Section formatting ─────────────────────────────────────────────────────
+\usepackage{titlesec}
+\titleformat{\section}
+  {\Large\bfseries}
+  {§\thesection}{1em}{}
+\titleformat{\subsection}
+  {\large\bfseries}
+  {\thesubsection}{1em}{}
+\titleformat{\subsubsection}
+  {\normalsize\bfseries}
+  {\thesubsubsection}{1em}{}
+
+% ── Hyperlinks ─────────────────────────────────────────────────────────────
+\usepackage[
+  colorlinks=true, linkcolor=black, citecolor=black, urlcolor=blue
+]{hyperref}
+
+% ── Convenience macros ─────────────────────────────────────────────────────
+\newcommand{\file}[1]{\texttt{#1}}
+\newcommand{\type}[1]{\texttt{#1}}
+\newcommand{\field}[1]{\texttt{#1}}
+\newcommand{\Ang}{\text{\AA}}
+\newcommand{\kcalmol}{\text{kcal/mol}}
+
+% ════════════════════════════════════════════════════════════════════════════
+%  Title
+% ════════════════════════════════════════════════════════════════════════════
+\title{%
+  \textbf{Formation Engine Methodology}\\[6pt]
+  \textbf{XYZ File Formats}\\[10pt]
+  \large VSEPR-SIM Atomistic Engine\\
+  Formats: \texttt{.xyz}\quad\texttt{.xyza}\quad\texttt{.xyzc}\quad\texttt{.xyzf}\\[4pt]
+  \normalsize Edition 2 --- Expanded Reference
+}
+\author{VSEPR-SIM Project}
+\date{Version 3.0.0 --- \today}
+
+% ════════════════════════════════════════════════════════════════════════════
+\begin{document}
+\maketitle
+
+% ════════════════════════════════════════════════════════════════════════════
+%  Abstract
+% ════════════════════════════════════════════════════════════════════════════
+\begin{abstract}
+All VSEPR-SIM molecular I/O uses plain-text, line-oriented files.
+Four formats share a common structural grammar; each adds fields to
+the preceding one.  This document is the expanded second-edition
+reference for the \texttt{.xyz}, \texttt{.xyza}, \texttt{.xyzc}, and
+\texttt{.xyzf} file formats, including grammar specifications, field
+semantics, coordinate conventions, checkpoint and trajectory usage,
+bounding-box encoding, implementation mapping, and typical observable
+ranges.
+\end{abstract}
+
+\tableofcontents
+\newpage
+
+% ════════════════════════════════════════════════════════════════════════════
+\section{Overview}
+% ════════════════════════════════════════════════════════════════════════════
+
+The VSEPR-SIM atomistic engine reads and writes molecular geometry,
+dynamics, and checkpoint data using four progressively richer
+plain-text formats.  Each format extends the previous one by appending
+per-atom or per-frame metadata while preserving backward compatibility
+with simple line-oriented parsers.
+
+\begin{table}[htbp]
+  \centering
+  \caption{Format hierarchy.}
+  \label{tab:hierarchy}
+  \begin{tabular}{llp{8cm}}
+    \toprule
+    Extension & Name & Use case \\
+    \midrule
+    \texttt{.xyz}  & Standard XYZ     & Static geometry snapshot \\
+    \texttt{.xyza} & Extended XYZ     & Charges, velocities, forces \\
+    \texttt{.xyzc} & Checkpoint XYZ   & Restartable MD state \\
+    \texttt{.xyzf} & Formation XYZ    & Multi-frame trajectory \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\subsection{Unit Conventions}
+
+All formats share a single, non-negotiable unit system:
+
+\begin{table}[htbp]
+  \centering
+  \caption{Unit system (all formats).}
+  \label{tab:units}
+  \begin{tabular}{lll}
+    \toprule
+    Quantity & Unit & SI equivalent \\
+    \midrule
+    Coordinates   & \AA{} (angstrom) & $10^{-10}$\,m \\
+    Energy        & kcal/mol         & $4.184 \times 10^{3}$\,J/mol \\
+    Velocity      & \AA/fs           & $10^{5}$\,m/s \\
+    Force         & kcal/(mol\,\AA)  & $6.947 \times 10^{13}$\,N/mol \\
+    Charge        & elementary $e$   & $1.602 \times 10^{-19}$\,C \\
+    Time          & fs               & $10^{-15}$\,s \\
+    Temperature   & K                & kelvin \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\subsection{Coordinate System}
+
+Right-handed Cartesian $(x, y, z)$ in \AA.  Origin is arbitrary;
+the conventional choice is near the centre of mass.  Coordinate
+precision: six decimal places ($\Rightarrow$ resolution $\approx
+0.1$\,pm).
+
+% ════════════════════════════════════════════════════════════════════════════
+\section{Standard XYZ (\texttt{.xyz})}
+\label{sec:xyz}
+% ════════════════════════════════════════════════════════════════════════════
+
+\subsection{Grammar}
+
+\begin{lstlisting}[language={},frame=single]
+<N>
+<comment>
+<sym> <x> <y> <z>
+...  (N lines)
+\end{lstlisting}
+
+\begin{itemize}
+  \item \textbf{Line 1}: atom count $N$ (integer $\ge 1$).
+  \item \textbf{Line 2}: free-text comment (may be empty).
+  \item \textbf{Lines 3--$(N{+}2)$}: element symbol + three Cartesian
+        coordinates, whitespace-separated.
+\end{itemize}
+
+\subsection{Comment Line Convention}
+
+The comment line follows a structured-but-optional pattern:
+
+\begin{lstlisting}[language={},frame=single]
+<name> | E = <val> kcal/mol | <notes>
+\end{lstlisting}
+
+Fields are pipe-delimited.  The energy key \texttt{E =} is
+recognised by the reader for energy-tracking contexts (minimisation
+traces, conformer scans).  Additional free-text notes are permitted
+after the second pipe.
+
+\subsection{Example: Water}
+
+\begin{lstlisting}[language={},frame=single]
+3
+H2O | E = -6.245 kcal/mol
+O   0.000000   0.000000   0.119262
+H   0.000000   0.763239  -0.477049
+H   0.000000  -0.763239  -0.477049
+\end{lstlisting}
+
+\subsection{Parsing Notes}
+
+\begin{itemize}
+  \item Element symbols are case-sensitive: \texttt{He} is helium,
+        \texttt{HE} is rejected.
+  \item Trailing whitespace on atom lines is ignored.
+  \item Blank lines between the comment line and the first atom line
+        are \emph{not} permitted; the reader expects $N$ consecutive
+        atom lines starting at line 3.
+  \item Coordinate fields must parse as IEEE~754 double-precision
+        floating-point values.
+\end{itemize}
+
+% ════════════════════════════════════════════════════════════════════════════
+\section{Extended XYZ (\texttt{.xyza})}
+\label{sec:xyza}
+% ════════════════════════════════════════════════════════════════════════════
+
+Adds per-atom scalar and vector properties after the $(x, y, z)$
+fields.
+
+\subsection{Grammar}
+
+\begin{lstlisting}[language={},frame=single]
+<N>
+<comment> properties="<list>"
+<sym> <x> <y> <z> [<q> <vx> <vy> <vz> <fx> <fy> <fz> <e>]
+\end{lstlisting}
+
+The \texttt{properties} key in the comment line declares which
+optional columns are present.  Column order is fixed; omission is
+permitted only from the right (i.e.\ you cannot include velocity
+without charge).
+
+\subsection{Property Columns}
+
+\begin{table}[htbp]
+  \centering
+  \caption{Extended property columns (fixed order).}
+  \label{tab:xyza_cols}
+  \begin{tabular}{llll}
+    \toprule
+    Key & Symbol & Unit & Columns \\
+    \midrule
+    \texttt{charge}   & $q_i$          & $e$                   & 1 \\
+    \texttt{velocity} & $\mathbf{v}_i$ & \AA/fs                & 3 \\
+    \texttt{force}    & $\mathbf{F}_i$ & kcal/(mol\,\AA)       & 3 \\
+    \texttt{energy}   & $\varepsilon_i$& kcal/mol              & 1 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\subsection{Properties Declaration Syntax}
+
+The \texttt{properties} value is a colon-separated list of keys:
+
+\begin{lstlisting}[language={},frame=single]
+properties="charge:velocity"
+properties="charge:velocity:force:energy"
+\end{lstlisting}
+
+Unrecognised keys trigger a parse warning but do not abort the read.
+
+\subsection{Example: H\texorpdfstring{$_2$}{2}O with Charges and Velocities}
+
+\begin{lstlisting}[language={},frame=single]
+3
+Water MD frame 1 properties="charge:velocity"
+O   0.00   0.00   0.12  -0.834   0.00   0.00   0.00
+H   0.00   0.76  -0.48   0.417   0.12   0.08  -0.03
+H   0.00  -0.76  -0.48   0.417  -0.12   0.08  -0.03
+\end{lstlisting}
+
+\subsection{Charge Semantics}
+
+The charge field $q_i$ represents the effective partial charge used
+in Coulomb interactions.  It is \emph{not} an oxidation state.  For
+Drude-polarisable models, $q_i$ is the core charge; the Drude
+particle charge is stored separately in the polarisation subsystem.
+
+% ════════════════════════════════════════════════════════════════════════════
+\section{Checkpoint XYZ (\texttt{.xyzc})}
+\label{sec:xyzc}
+% ════════════════════════════════════════════════════════════════════════════
+
+Extends \texttt{.xyza} with a simulation-state header block required
+to restart an interrupted MD run without loss of trajectory
+continuity.
+
+\subsection{Header Block}
+
+The header block appears \emph{before} the atom-count line and is
+delimited by \texttt{CHECKPOINT} / \texttt{END\_CHECKPOINT} markers:
+
+\begin{lstlisting}[language={},frame=single]
+CHECKPOINT
+step       <integer>
+time       <float> fs
+dt         <float> fs
+T_target   <float> K
+seed       <integer>
+box        <ax> <ay> <az>
+END_CHECKPOINT
+<N>
+<comment>
+<atom lines with charge + velocity + force>
+\end{lstlisting}
+
+\subsection{Header Field Semantics}
+
+\begin{table}[htbp]
+  \centering
+  \caption{Checkpoint header fields.}
+  \label{tab:xyzc_header}
+  \begin{tabular}{llp{7.5cm}}
+    \toprule
+    Field & Type & Meaning \\
+    \midrule
+    \texttt{step}      & integer & MD step number at checkpoint \\
+    \texttt{time}      & float   & Accumulated simulation time (fs) \\
+    \texttt{dt}        & float   & Integrator timestep (fs) \\
+    \texttt{T\_target} & float   & Thermostat set-point (K); 0 = NVE ensemble \\
+    \texttt{seed}      & integer & RNG seed for reproducible continuation \\
+    \texttt{box}       & 3 floats & Simulation box side lengths (\AA);
+                                    omit line entirely for open boundary \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\subsection{Restart Protocol}
+
+When the engine loads a \texttt{.xyzc} file:
+
+\begin{enumerate}
+  \item The header is parsed and the integrator state is restored
+        (step counter, time accumulator, timestep, thermostat target,
+        RNG state).
+  \item The atom block is read as a standard \texttt{.xyza} frame
+        with all available property columns.
+  \item Neighbour lists and bond tables are reconstructed from
+        coordinates; they are \emph{never} serialised into the
+        checkpoint.
+  \item If a \texttt{box} line is present, periodic boundary
+        conditions are activated with the specified box geometry.
+\end{enumerate}
+
+\subsection{Checkpoint vs.\ Trajectory}
+
+A \texttt{.xyzc} file contains exactly one frame.  It is a snapshot,
+not a trajectory.  For multi-frame output, use \texttt{.xyzf}
+(§\ref{sec:xyzf}).
+
+% ════════════════════════════════════════════════════════════════════════════
+\section{Formation XYZ (\texttt{.xyzf})}
+\label{sec:xyzf}
+% ════════════════════════════════════════════════════════════════════════════
+
+A multi-frame format: one or more standard \texttt{.xyz} or
+\texttt{.xyza} blocks concatenated in a single file, separated only
+by the next atom-count line.  Used for minimisation traces, NVT
+trajectories, and reaction paths.
+
+\subsection{Grammar}
+
+\begin{lstlisting}[language={},frame=single]
+<N>           <- frame 1
+<comment>
+<atom lines>
+<N>           <- frame 2
+<comment>
+<atom lines>
+...
+\end{lstlisting}
+
+Each frame is self-contained and independently parseable.
+
+\subsection{Comment Line Convention (Multi-Frame)}
+
+The comment line of frame $k$ typically records the step index and
+instantaneous energy:
+
+\begin{lstlisting}[language={},frame=single]
+Step 0 | E = -12.30 kcal/mol | FIRE iter
+Step 1 | E = -13.11 kcal/mol | FIRE iter
+\end{lstlisting}
+
+\subsection{Frame Independence}
+
+Each frame in a \texttt{.xyzf} file must be independently parseable.
+This means:
+
+\begin{itemize}
+  \item The atom count $N$ may vary between frames (e.g.\ if atoms
+        are added or removed during a grand-canonical simulation).
+  \item The \texttt{properties} declaration may differ between frames
+        (e.g.\ early frames may lack forces if computed lazily).
+  \item Readers must re-parse the header of each frame; caching the
+        first frame's column layout and applying it globally is a bug.
+\end{itemize}
+
+\subsection{Typical Uses}
+
+\begin{table}[htbp]
+  \centering
+  \caption{Common \texttt{.xyzf} applications.}
+  \label{tab:xyzf_uses}
+  \begin{tabular}{lp{8cm}}
+    \toprule
+    Application & Comment line pattern \\
+    \midrule
+    FIRE minimisation trace  & \texttt{Step <k> | E = <val> kcal/mol | FIRE iter} \\
+    NVT trajectory dump      & \texttt{Step <k> | E = <val> kcal/mol | T = <T> K} \\
+    Reaction path (NEB)      & \texttt{Image <k> | E = <val> kcal/mol | dE = <dE>} \\
+    Conformer scan           & \texttt{Conf <k> | E = <val> kcal/mol | <dihedral>} \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+% ════════════════════════════════════════════════════════════════════════════
+\section{Bounding Box and Periodic Boundary Conditions}
+\label{sec:pbc}
+% ════════════════════════════════════════════════════════════════════════════
+
+When periodic boundary conditions (PBC) are active, the box geometry
+is stored either in the \texttt{.xyzc} header (§\ref{sec:xyzc}) or
+as special comment-line keys in any format.
+
+\subsection{Comment-Line Encoding}
+
+\begin{lstlisting}[language={},frame=single]
+Lattice="ax 0 0  0 ay 0  0 0 az" pbc="T T T"
+\end{lstlisting}
+
+\begin{itemize}
+  \item Box vectors are in \AA, given as a flattened $3\times 3$
+        matrix (row-major).  Orthorhombic cells use diagonal entries
+        only; triclinic cells populate off-diagonal terms.
+  \item \texttt{pbc} flags indicate which axes are periodic
+        (\texttt{T}) or open (\texttt{F}).
+  \item The format is compatible with the ASE Extended XYZ convention,
+        enabling interoperability with the Atomic Simulation Environment.
+\end{itemize}
+
+\subsection{Box Vector Interpretation}
+
+For an orthorhombic cell with side lengths $a_x, a_y, a_z$:
+\begin{equation}
+  \mathbf{L} =
+  \begin{pmatrix}
+    a_x & 0   & 0   \\
+    0   & a_y & 0   \\
+    0   & 0   & a_z
+  \end{pmatrix}
+  \label{eq:lattice}
+\end{equation}
+
+The cell volume is $V = \det(\mathbf{L}) = a_x \cdot a_y \cdot a_z$.
+For triclinic cells, the full matrix is used and $V = \det(\mathbf{L})$
+remains the volume.
+
+\subsection{Minimum Image Convention}
+
+Under PBC, the engine applies the minimum-image convention for
+pairwise distances:
+\begin{equation}
+  \Delta r_\alpha = r_\alpha^{(j)} - r_\alpha^{(i)}
+    - L_\alpha \cdot \mathrm{round}\!\left(
+      \frac{r_\alpha^{(j)} - r_\alpha^{(i)}}{L_\alpha}
+    \right),
+  \qquad \alpha \in \{x, y, z\}
+  \label{eq:mic}
+\end{equation}
+where $L_\alpha$ is the box length along axis $\alpha$ and the
+$\mathrm{round}$ function returns the nearest integer.
+
+% ════════════════════════════════════════════════════════════════════════════
+\section{Bond Auto-Detection}
+\label{sec:bonds}
+% ════════════════════════════════════════════════════════════════════════════
+
+Bond connectivity is inferred from geometry, never stored in the file.
+The \texttt{detect\_bonds} function uses per-element covalent radii
+with a configurable scale factor:
+\begin{equation}
+  d_{ij} < s \cdot \bigl(r_{\text{cov}}(Z_i) + r_{\text{cov}}(Z_j)\bigr)
+  \quad \Longrightarrow \quad \text{bond}(i, j)
+  \label{eq:bond}
+\end{equation}
+where $s$ is the scale factor (default $s = 1.2$).
+
+\subsection{Design Rationale}
+
+Bonds are derived data, not ground truth.  Serialising bonds into
+the file format would create a maintenance liability: any coordinate
+update would require bond-table synchronisation, and stale bond
+tables are a silent-corruption vector.  The \S0 container philosophy
+(§0.2.6 of the Identity--State Decomposition) formalises this:
+caches never become truth.
+
+% ════════════════════════════════════════════════════════════════════════════
+\section{Implementation Mapping}
+\label{sec:impl}
+% ════════════════════════════════════════════════════════════════════════════
+
+\begin{table}[htbp]
+  \centering
+  \caption{Source files implementing the XYZ format family.}
+  \label{tab:impl}
+  \begin{tabular}{lp{8.5cm}}
+    \toprule
+    File & Role \\
+    \midrule
+    \file{include/io/xyz\_format.hpp}
+      & Struct definitions, public API for \type{XYZReader},
+        \type{XYZWriter}, \type{XYZAReader}, \type{XYZAWriter} \\
+    \file{src/io/xyz\_format.cpp}
+      & Reader / writer implementation \\
+    \file{include/thermal/xyzc\_format.hpp}
+      & Checkpoint reader/writer declarations \\
+    \file{src/thermal/xyzc\_format.cpp}
+      & Checkpoint reader/writer implementation \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+All reader and writer types reside in namespace \type{vsepr::io}.
+
+\subsection{Reader API Pattern}
+
+Readers follow a common pattern:
+
+\begin{lstlisting}
+// Standard XYZ
+auto frame = vsepr::io::XYZReader::read("molecule.xyz");
+
+// Extended XYZ
+auto frame = vsepr::io::XYZAReader::read("dynamics.xyza");
+
+// Checkpoint
+auto state = vsepr::io::XYZCReader::read("restart.xyzc");
+
+// Formation (multi-frame)
+auto traj = vsepr::io::XYZFReader::read_all("trajectory.xyzf");
+// or frame-by-frame:
+vsepr::io::XYZFReader reader("trajectory.xyzf");
+while (auto frame = reader.next()) { /* ... */ }
+\end{lstlisting}
+
+\subsection{Writer API Pattern}
+
+\begin{lstlisting}
+// Single frame
+vsepr::io::XYZWriter::write("output.xyz", atoms, comment);
+
+// Extended with properties
+vsepr::io::XYZAWriter::write("output.xyza", atoms, props, comment);
+
+// Checkpoint
+vsepr::io::XYZCWriter::write("checkpoint.xyzc", state);
+
+// Append to trajectory
+vsepr::io::XYZFWriter writer("trajectory.xyzf", /*append=*/true);
+writer.write_frame(atoms, comment);
+\end{lstlisting}
+
+% ════════════════════════════════════════════════════════════════════════════
+\section{Typical Energy and Observable Ranges}
+\label{sec:ranges}
+% ════════════════════════════════════════════════════════════════════════════
+
+\begin{table}[htbp]
+  \centering
+  \caption{Typical observable magnitudes for sanity checking.}
+  \label{tab:ranges}
+  \begin{tabular}{llr}
+    \toprule
+    Observable & Typical range & Unit \\
+    \midrule
+    Total bonded energy     & $-10^2$ to $-10^5$         & kcal/mol \\
+    Relative conformer      & 0.1 -- 10                  & kcal/mol \\
+    Activation barrier      & 5 -- 50                    & kcal/mol \\
+    Force (unrelaxed)       & 1 -- 100                   & kcal/(mol\,\AA) \\
+    Force convergence       & $< 0.01$                   & kcal/(mol\,\AA) \\
+    Velocity (300\,K, C)    & $\sim 0.02$                & \AA/fs \\
+    Partial charge (O in water)  & $-0.82$ to $-0.84$    & $e$ \\
+    Partial charge (H in water)  & $+0.41$ to $+0.42$    & $e$ \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+These ranges serve as first-pass sanity checks.  Values outside
+these bounds in production output should trigger audit warnings.
+
+% ════════════════════════════════════════════════════════════════════════════
+\section{Integration with the Identity--State Framework}
+\label{sec:s0}
+% ════════════════════════════════════════════════════════════════════════════
+
+The XYZ file formats serve as the serialisation layer for the
+particle identity vector $\mathbf{I}_i$ defined in §0 of the
+Formation Engine methodology.  The mapping is:
+
+\begin{table}[htbp]
+  \centering
+  \caption{Identity vector components and their file-format encoding.}
+  \label{tab:s0_map}
+  \begin{tabular}{llp{6.5cm}}
+    \toprule
+    Component & Symbol & File encoding \\
+    \midrule
+    Nuclear identity  & $Z_i$      & Element symbol on atom line
+                                      (looked up to $Z$) \\
+    Mass identity     & $A_i$      & Implicit via $Z_i$
+                                      (isotopic override not in format) \\
+    Charge participation & $Q_i$   & \texttt{charge} column in
+                                      \texttt{.xyza} \\
+    Structural role   & $\Sigma_i$ & Not serialised; inferred from
+                                      bond topology at load \\
+    Stability class   & $\Lambda_i$& Not serialised; computed
+                                      post-load \\
+    Provenance memory & $\Theta_i$ & Comment-line metadata \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+The cell container $\mathcal{K}$ maps to the file-level structure:
+$\mathcal{K}_{\text{id}}$ is encoded in the filename and comment-line
+provenance; $\mathcal{K}_{\text{geom}}$ is the lattice matrix from
+the \texttt{Lattice} key or \texttt{box} header line;
+$\mathcal{K}_{\text{comp}}$ is reconstructed at load from element
+composition and geometry.
+
+The source-layer flag $F_K \in \{Z, A, C\}$ in the cell identity
+directly corresponds to the \type{XYZFormat} enumeration in the
+codebase, mapping \texttt{Z}$\to$\texttt{.xyz},
+\texttt{A}$\to$\texttt{.xyza}, \texttt{C}$\to$\texttt{.xyzc}.
+
+% ════════════════════════════════════════════════════════════════════════════
+\section{Format Comparison Matrix}
+\label{sec:matrix}
+% ════════════════════════════════════════════════════════════════════════════
+
+\begin{table}[htbp]
+  \centering
+  \caption{Feature comparison across formats.}
+  \label{tab:matrix}
+  \begin{tabular}{lcccc}
+    \toprule
+    Feature & \texttt{.xyz} & \texttt{.xyza} & \texttt{.xyzc} & \texttt{.xyzf} \\
+    \midrule
+    Atom count + coordinates       & \checkmark & \checkmark & \checkmark & \checkmark \\
+    Partial charges                &            & \checkmark & \checkmark & opt. \\
+    Velocities                     &            & \checkmark & \checkmark & opt. \\
+    Forces                         &            & \checkmark & \checkmark & opt. \\
+    Per-atom energy                &            & \checkmark & \checkmark & opt. \\
+    Integrator state               &            &            & \checkmark & \\
+    Thermostat / RNG               &            &            & \checkmark & \\
+    Box geometry (header)          &            &            & \checkmark & \\
+    Box geometry (comment key)     & \checkmark & \checkmark & \checkmark & \checkmark \\
+    Multi-frame                    &            &            &            & \checkmark \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+% ════════════════════════════════════════════════════════════════════════════
+\section{Error Handling and Validation}
+\label{sec:errors}
+% ════════════════════════════════════════════════════════════════════════════
+
+Readers enforce the following validation rules at parse time:
+
+\begin{enumerate}
+  \item \textbf{Atom count mismatch.}  If fewer than $N$ atom lines
+        follow the header, the reader throws
+        \type{XYZParseError::INCOMPLETE\_FRAME}.
+  \item \textbf{Unknown element.}  An unrecognised element symbol
+        triggers \type{XYZParseError::UNKNOWN\_ELEMENT}.  Two-letter
+        symbols must match the periodic table exactly (case-sensitive).
+  \item \textbf{Malformed coordinates.}  Non-numeric coordinate fields
+        trigger \type{XYZParseError::BAD\_COORDINATE}.
+  \item \textbf{Column count mismatch.}  If the declared
+        \texttt{properties} string implies $k$ columns per atom but
+        a line has fewer, the reader emits a warning and fills missing
+        fields with zero (fail-soft for velocities and forces; fail-hard
+        for coordinates).
+  \item \textbf{Checkpoint integrity.}  A \texttt{.xyzc} file missing
+        the \texttt{CHECKPOINT}/\texttt{END\_CHECKPOINT} block is
+        rejected with \type{XYZCParseError::NO\_HEADER}.
+\end{enumerate}
+
+% ════════════════════════════════════════════════════════════════════════════
+\section{Cross-References}
+% ════════════════════════════════════════════════════════════════════════════
+
+\begin{table}[htbp]
+  \centering
+  \caption{Related documentation.}
+  \label{tab:xrefs}
+  \begin{tabular}{lp{8cm}}
+    \toprule
+    Document & Relevance \\
+    \midrule
+    \file{docs/FILE\_FORMATS.md}
+      & Prose description of all I/O formats \\
+    \file{section0\_identity\_state\_decomposition.pdf}
+      & Formal particle/cell/world container definitions \\
+    \file{section5\_integration.tex}
+      & MD timestep conventions and integrator details \\
+    \file{ALPHA\_MODEL\_BOOKLET.tex}
+      & Alpha model reference (Drude charge coupling) \\
+    \file{section\_fuzzy\_ball\_model.tex}
+      & Coarse-grained bead visualisation consuming XYZ data \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\vfill
+
+\begin{center}
+\rule{0.5\textwidth}{0.4pt}\\[6pt]
+\small Formation Engine Methodology v3.0.0 --- XYZ File Formats (Edition 2)
+\end{center}
+
+\end{document}
+
+\subsection{Properties Declaration Syntax}
+
+The \texttt{properties} value is a colon-separated list of keys:
+
+\begin{lstlisting}[language={},frame=single]
+properties="charge:velocity"
+properties="charge:velocity:force:energy"
+\end{lstlisting}
+
+Unrecognised keys trigger a parse warning but do not abort the read.
+
+\subsection{Example: H\texorpdfstring{$_2$}{2}O with Charges and Velocities}
+
+\begin{lstlisting}[language={},frame=single]
+3
+Water MD frame 1 properties="charge:velocity"
+O   0.00   0.00   0.12  -0.834   0.00   0.00   0.00
+H   0.00   0.76  -0.48   0.417   0.12   0.08  -0.03
+H   0.00  -0.76  -0.48   0.417  -0.12   0.08  -0.03
+\end{lstlisting}
+
+\subsection{Charge Semantics}
+
+The charge field $q_i$ represents the effective partial charge used
+in Coulomb interactions.  It is \emph{not} an oxidation state.  For
+Drude-polarisable models, $q_i$ is the core charge; the Drude
+particle charge is stored separately in the polarisation subsystem.
+
+% ════════════════════════════════════════════════════════════════════════════
+\section{Checkpoint XYZ (\texttt{.xyzc})}
+\label{sec:xyzc}
+% ════════════════════════════════════════════════════════════════════════════
+
+Extends \texttt{.xyza} with a simulation-state header block required
+to restart an interrupted MD run without loss of trajectory
+continuity.
+
+\subsection{Header Block}
+
+The header block appears \emph{before} the atom-count line and is
+delimited by \texttt{CHECKPOINT} / \texttt{END\_CHECKPOINT} markers:
+
+\begin{lstlisting}[language={},frame=single]
+CHECKPOINT
+step       <integer>
+time       <float> fs
+dt         <float> fs
+T_target   <float> K
+seed       <integer>
+box        <ax> <ay> <az>
+END_CHECKPOINT
+<N>
+<comment>
+<atom lines with charge + velocity + force>
+\end{lstlisting}
+
+\subsection{Header Field Semantics}
+
+\begin{table}[htbp]
+  \centering
+  \caption{Checkpoint header fields.}
+  \label{tab:xyzc_header}
+  \begin{tabular}{llp{7.5cm}}
+    \toprule
+    Field & Type & Meaning \\
+    \midrule
+    \texttt{step}      & integer & MD step number at checkpoint \\
+    \texttt{time}      & float   & Accumulated simulation time (fs) \\
+    \texttt{dt}        & float   & Integrator timestep (fs) \\
+    \texttt{T\_target} & float   & Thermostat set-point (K); 0 = NVE ensemble \\
+    \texttt{seed}      & integer & RNG seed for reproducible continuation \\
+    \texttt{box}       & 3 floats & Simulation box side lengths (\AA);
+                                    omit line entirely for open boundary \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\subsection{Restart Protocol}
+
+When the engine loads a \texttt{.xyzc} file:
+
+\begin{enumerate}
+  \item The header is parsed and the integrator state is restored
+        (step counter, time accumulator, timestep, thermostat target,
+        RNG state).
+  \item The atom block is read as a standard \texttt{.xyza} frame
+        with all available property columns.
+  \item Neighbour lists and bond tables are reconstructed from
+        coordinates; they are \emph{never} serialised into the
+        checkpoint.
+  \item If a \texttt{box} line is present, periodic boundary
+        conditions are activated with the specified box geometry.
+\end{enumerate}
+
+\subsection{Checkpoint vs.\ Trajectory}
+
+A \texttt{.xyzc} file contains exactly one frame.  It is a snapshot,
+not a trajectory.  For multi-frame output, use \texttt{.xyzf}
+(§\ref{sec:xyzf}).
+
+% ════════════════════════════════════════════════════════════════════════════
+\section{Formation XYZ (\texttt{.xyzf})}
+\label{sec:xyzf}
+% ════════════════════════════════════════════════════════════════════════════
+
+A multi-frame format: one or more standard \texttt{.xyz} or
+\texttt{.xyza} blocks concatenated in a single file, separated only
+by the next atom-count line.  Used for minimisation traces, NVT
+trajectories, and reaction paths.
+
+\subsection{Grammar}
+
+\begin{lstlisting}[language={},frame=single]
+<N>           <- frame 1
+<comment>
+<atom lines>
+<N>           <- frame 2
+<comment>
+<atom lines>
+...
+\end{lstlisting}
+
+Each frame is self-contained and independently parseable.
+
+\subsection{Comment Line Convention (Multi-Frame)}
+
+The comment line of frame $k$ typically records the step index and
+instantaneous energy:
+
+\begin{lstlisting}[language={},frame=single]
+Step 0 | E = -12.30 kcal/mol | FIRE iter
+Step 1 | E = -13.11 kcal/mol | FIRE iter
+\end{lstlisting}
+
+\subsection{Frame Independence}
+
+Each frame in a \texttt{.xyzf} file must be independently parseable.
+This means:
+
+\begin{itemize}
+  \item The atom count $N$ may vary between frames (e.g.\ if atoms
+        are added or removed during a grand-canonical simulation).
+  \item The \texttt{properties} declaration may differ between frames
+        (e.g.\ early frames may lack forces if computed lazily).
+  \item Readers must re-parse the header of each frame; caching the
+        first frame's column layout and applying it globally is a bug.
+\end{itemize}
+
+\subsection{Typical Uses}
+
+\begin{table}[htbp]
+  \centering
+  \caption{Common \texttt{.xyzf} applications.}
+  \label{tab:xyzf_uses}
+  \begin{tabular}{lp{8cm}}
+    \toprule
+    Application & Comment line pattern \\
+    \midrule
+    FIRE minimisation trace  & \texttt{Step <k> | E = <val> kcal/mol | FIRE iter} \\
+    NVT trajectory dump      & \texttt{Step <k> | E = <val> kcal/mol | T = <T> K} \\
+    Reaction path (NEB)      & \texttt{Image <k> | E = <val> kcal/mol | dE = <dE>} \\
+    Conformer scan           & \texttt{Conf <k> | E = <val> kcal/mol | <dihedral>} \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+% ════════════════════════════════════════════════════════════════════════════
+\section{Bounding Box and Periodic Boundary Conditions}
+\label{sec:pbc}
+% ════════════════════════════════════════════════════════════════════════════
+
+When periodic boundary conditions (PBC) are active, the box geometry
+is stored either in the \texttt{.xyzc} header (§\ref{sec:xyzc}) or
+as special comment-line keys in any format.
+
+\subsection{Comment-Line Encoding}
+
+\begin{lstlisting}[language={},frame=single]
+Lattice="ax 0 0  0 ay 0  0 0 az" pbc="T T T"
+\end{lstlisting}
+
+\begin{itemize}
+  \item Box vectors are in \AA, given as a flattened $3\times 3$
+        matrix (row-major).  Orthorhombic cells use diagonal entries
+        only; triclinic cells populate off-diagonal terms.
+  \item \texttt{pbc} flags indicate which axes are periodic
+        (\texttt{T}) or open (\texttt{F}).
+  \item The format is compatible with the ASE Extended XYZ convention,
+        enabling interoperability with the Atomic Simulation Environment.
+\end{itemize}
+
+\subsection{Box Vector Interpretation}
+
+For an orthorhombic cell with side lengths $a_x, a_y, a_z$:
+\begin{equation}
+  \mathbf{L} =
+  \begin{pmatrix}
+    a_x & 0   & 0   \\
+    0   & a_y & 0   \\
+    0   & 0   & a_z
+  \end{pmatrix}
+  \label{eq:lattice}
+\end{equation}
+
+The cell volume is $V = \det(\mathbf{L}) = a_x \cdot a_y \cdot a_z$.
+For triclinic cells, the full matrix is used and $V = \det(\mathbf{L})$
+remains the volume.
+
+\subsection{Minimum Image Convention}
+
+Under PBC, the engine applies the minimum-image convention for
+pairwise distances:
+\begin{equation}
+  \Delta r_\alpha = r_\alpha^{(j)} - r_\alpha^{(i)}
+    - L_\alpha \cdot \mathrm{round}\!\left(
+      \frac{r_\alpha^{(j)} - r_\alpha^{(i)}}{L_\alpha}
+    \right),
+  \qquad \alpha \in \{x, y, z\}
+  \label{eq:mic}
+\end{equation}
+where $L_\alpha$ is the box length along axis $\alpha$ and the
+$\mathrm{round}$ function returns the nearest integer.
+
+% ════════════════════════════════════════════════════════════════════════════
+\section{Bond Auto-Detection}
+\label{sec:bonds}
+% ════════════════════════════════════════════════════════════════════════════
+
+Bond connectivity is inferred from geometry, never stored in the file.
+The \texttt{detect\_bonds} function uses per-element covalent radii
+with a configurable scale factor:
+\begin{equation}
+  d_{ij} < s \cdot \bigl(r_{\text{cov}}(Z_i) + r_{\text{cov}}(Z_j)\bigr)
+  \quad \Longrightarrow \quad \text{bond}(i, j)
+  \label{eq:bond}
+\end{equation}
+where $s$ is the scale factor (default $s = 1.2$).
+
+\subsection{Design Rationale}
+
+Bonds are derived data, not ground truth.  Serialising bonds into
+the file format would create a maintenance liability: any coordinate
+update would require bond-table synchronisation, and stale bond
+tables are a silent-corruption vector.  The \S0 container philosophy
+(§0.2.6 of the Identity--State Decomposition) formalises this:
+caches never become truth.
+
+% ════════════════════════════════════════════════════════════════════════════
+\section{Implementation Mapping}
+\label{sec:impl}
+% ════════════════════════════════════════════════════════════════════════════
+
+\begin{table}[htbp]
+  \centering
+  \caption{Source files implementing the XYZ format family.}
+  \label{tab:impl}
+  \begin{tabular}{lp{8.5cm}}
+    \toprule
+    File & Role \\
+    \midrule
+    \file{include/io/xyz\_format.hpp}
+      & Struct definitions, public API for \type{XYZReader},
+        \type{XYZWriter}, \type{XYZAReader}, \type{XYZAWriter} \\
+    \file{src/io/xyz\_format.cpp}
+      & Reader / writer implementation \\
+    \file{include/thermal/xyzc\_format.hpp}
+      & Checkpoint reader/writer declarations \\
+    \file{src/thermal/xyzc\_format.cpp}
+      & Checkpoint reader/writer implementation \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+All reader and writer types reside in namespace \type{vsepr::io}.
+
+\subsection{Reader API Pattern}
+
+Readers follow a common pattern:
+
+\begin{lstlisting}
+// Standard XYZ
+auto frame = vsepr::io::XYZReader::read("molecule.xyz");
+
+// Extended XYZ
+auto frame = vsepr::io::XYZAReader::read("dynamics.xyza");
+
+// Checkpoint
+auto state = vsepr::io::XYZCReader::read("restart.xyzc");
+
+// Formation (multi-frame)
+auto traj = vsepr::io::XYZFReader::read_all("trajectory.xyzf");
+// or frame-by-frame:
+vsepr::io::XYZFReader reader("trajectory.xyzf");
+while (auto frame = reader.next()) { /* ... */ }
+\end{lstlisting}
+
+\subsection{Writer API Pattern}
+
+\begin{lstlisting}
+// Single frame
+vsepr::io::XYZWriter::write("output.xyz", atoms, comment);
+
+// Extended with properties
+vsepr::io::XYZAWriter::write("output.xyza", atoms, props, comment);
+
+// Checkpoint
+vsepr::io::XYZCWriter::write("checkpoint.xyzc", state);
+
+// Append to trajectory
+vsepr::io::XYZFWriter writer("trajectory.xyzf", /*append=*/true);
+writer.write_frame(atoms, comment);
+\end{lstlisting}
+
+% ════════════════════════════════════════════════════════════════════════════
+\section{Typical Energy and Observable Ranges}
+\label{sec:ranges}
+% ════════════════════════════════════════════════════════════════════════════
+
+\begin{table}[htbp]
+  \centering
+  \caption{Typical observable magnitudes for sanity checking.}
+  \label{tab:ranges}
+  \begin{tabular}{llr}
+    \toprule
+    Observable & Typical range & Unit \\
+    \midrule
+    Total bonded energy     & $-10^2$ to $-10^5$         & kcal/mol \\
+    Relative conformer      & 0.1 -- 10                  & kcal/mol \\
+    Activation barrier      & 5 -- 50                    & kcal/mol \\
+    Force (unrelaxed)       & 1 -- 100                   & kcal/(mol\,\AA) \\
+    Force convergence       & $< 0.01$                   & kcal/(mol\,\AA) \\
+    Velocity (300\,K, C)    & $\sim 0.02$                & \AA/fs \\
+    Partial charge (O in water)  & $-0.82$ to $-0.84$    & $e$ \\
+    Partial charge (H in water)  & $+0.41$ to $+0.42$    & $e$ \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+These ranges serve as first-pass sanity checks.  Values outside
+these bounds in production output should trigger audit warnings.
+
+% ════════════════════════════════════════════════════════════════════════════
+\section{Integration with the Identity--State Framework}
+\label{sec:s0}
+% ════════════════════════════════════════════════════════════════════════════
+
+The XYZ file formats serve as the serialisation layer for the
+particle identity vector $\mathbf{I}_i$ defined in §0 of the
+Formation Engine methodology.  The mapping is:
+
+\begin{table}[htbp]
+  \centering
+  \caption{Identity vector components and their file-format encoding.}
+  \label{tab:s0_map}
+  \begin{tabular}{llp{6.5cm}}
+    \toprule
+    Component & Symbol & File encoding \\
+    \midrule
+    Nuclear identity  & $Z_i$      & Element symbol on atom line
+                                      (looked up to $Z$) \\
+    Mass identity     & $A_i$      & Implicit via $Z_i$
+                                      (isotopic override not in format) \\
+    Charge participation & $Q_i$   & \texttt{charge} column in
+                                      \texttt{.xyza} \\
+    Structural role   & $\Sigma_i$ & Not serialised; inferred from
+                                      bond topology at load \\
+    Stability class   & $\Lambda_i$& Not serialised; computed
+                                      post-load \\
+    Provenance memory & $\Theta_i$ & Comment-line metadata \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+The cell container $\mathcal{K}$ maps to the file-level structure:
+$\mathcal{K}_{\text{id}}$ is encoded in the filename and comment-line
+provenance; $\mathcal{K}_{\text{geom}}$ is the lattice matrix from
+the \texttt{Lattice} key or \texttt{box} header line;
+$\mathcal{K}_{\text{comp}}$ is reconstructed at load from element
+composition and geometry.
+
+The source-layer flag $F_K \in \{Z, A, C\}$ in the cell identity
+directly corresponds to the \type{XYZFormat} enumeration in the
+codebase, mapping \texttt{Z}$\to$\texttt{.xyz},
+\texttt{A}$\to$\texttt{.xyza}, \texttt{C}$\to$\texttt{.xyzc}.
+
+% ════════════════════════════════════════════════════════════════════════════
+\section{Format Comparison Matrix}
+\label{sec:matrix}
+% ════════════════════════════════════════════════════════════════════════════
+
+\begin{table}[htbp]
+  \centering
+  \caption{Feature comparison across formats.}
+  \label{tab:matrix}
+  \begin{tabular}{lcccc}
+    \toprule
+    Feature & \texttt{.xyz} & \texttt{.xyza} & \texttt{.xyzc} & \texttt{.xyzf} \\
+    \midrule
+    Atom count + coordinates       & \checkmark & \checkmark & \checkmark & \checkmark \\
+    Partial charges                &            & \checkmark & \checkmark & opt. \\
+    Velocities                     &            & \checkmark & \checkmark & opt. \\
+    Forces                         &            & \checkmark & \checkmark & opt. \\
+    Per-atom energy                &            & \checkmark & \checkmark & opt. \\
+    Integrator state               &            &            & \checkmark & \\
+    Thermostat / RNG               &            &            & \checkmark & \\
+    Box geometry (header)          &            &            & \checkmark & \\
+    Box geometry (comment key)     & \checkmark & \checkmark & \checkmark & \checkmark \\
+    Multi-frame                    &            &            &            & \checkmark \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+% ════════════════════════════════════════════════════════════════════════════
+\section{Error Handling and Validation}
+\label{sec:errors}
+% ════════════════════════════════════════════════════════════════════════════
+
+Readers enforce the following validation rules at parse time:
+
+\begin{enumerate}
+  \item \textbf{Atom count mismatch.}  If fewer than $N$ atom lines
+        follow the header, the reader throws
+        \type{XYZParseError::INCOMPLETE\_FRAME}.
+  \item \textbf{Unknown element.}  An unrecognised element symbol
+        triggers \type{XYZParseError::UNKNOWN\_ELEMENT}.  Two-letter
+        symbols must match the periodic table exactly (case-sensitive).
+  \item \textbf{Malformed coordinates.}  Non-numeric coordinate fields
+        trigger \type{XYZParseError::BAD\_COORDINATE}.
+  \item \textbf{Column count mismatch.}  If the declared
+        \texttt{properties} string implies $k$ columns per atom but
+        a line has fewer, the reader emits a warning and fills missing
+        fields with zero (fail-soft for velocities and forces; fail-hard
+        for coordinates).
+  \item \textbf{Checkpoint integrity.}  A \texttt{.xyzc} file missing
+        the \texttt{CHECKPOINT}/\texttt{END\_CHECKPOINT} block is
+        rejected with \type{XYZCParseError::NO\_HEADER}.
+\end{enumerate}
+
+% ════════════════════════════════════════════════════════════════════════════
+\section{Cross-References}
+% ════════════════════════════════════════════════════════════════════════════
+
+\begin{table}[htbp]
+  \centering
+  \caption{Related documentation.}
+  \label{tab:xrefs}
+  \begin{tabular}{lp{8cm}}
+    \toprule
+    Document & Relevance \\
+    \midrule
+    \file{docs/FILE\_FORMATS.md}
+      & Prose description of all I/O formats \\
+    \file{section0\_identity\_state\_decomposition.pdf}
+      & Formal particle/cell/world container definitions \\
+    \file{section5\_integration.tex}
+      & MD timestep conventions and integrator details \\
+    \file{ALPHA\_MODEL\_BOOKLET.tex}
+      & Alpha model reference (Drude charge coupling) \\
+    \file{section\_fuzzy\_ball\_model.tex}
+      & Coarse-grained bead visualisation consuming XYZ data \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\vfill
+
+\begin{center}
+\rule{0.5\textwidth}{0.4pt}\\[6pt]
+\small Formation Engine Methodology v3.0.0 --- XYZ File Formats (Edition 2)
+\end{center}
+
+\end{document}

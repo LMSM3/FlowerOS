@@ -1,8 +1,16 @@
 # ═══════════════════════════════════════════════════════════════════════════
 #  Better Color Mapping (RGB -> nearest pastel ANSI) + caching + dithering
+#  Now uses the compact encoding kernel (delta-colour + RLE) from
+#  lib/compact_encoding.py for smaller output files.
 # ═══════════════════════════════════════════════════════════════════════════
 
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent.parent / "lib"))
+
 from typing import Dict, Tuple, List, Optional
+from compact_encoding import CompactEncoder
 
 # Precompute approximate RGB for ANSI 256 codes (only for codes in your PASTEL list).
 # ANSI 256 palette:
@@ -77,10 +85,14 @@ def apply_dither(v: int, x: int, y: int, strength: int = 8) -> int:
     return 0 if out < 0 else 255 if out > 255 else out
 
 
-def image_to_ansi_ascii(img: Image.Image, out_width: int, dither: bool = True) -> str:
+def image_to_ansi_ascii(img: Image.Image, out_width: int, dither: bool = True,
+                        *, compact: bool = True) -> str:
     """
     Convert PIL Image to ANSI-colored ASCII art.
     Characters from luma; colors from RGB (nearest pastel match).
+
+    When compact=True (default) the output uses the compact encoding
+    kernel (delta-colour + run-length) for dramatically smaller files.
     """
     rgb = img.convert("RGB")
     w, h = rgb.size
@@ -100,11 +112,16 @@ def image_to_ansi_ascii(img: Image.Image, out_width: int, dither: bool = True) -
     ramp_len = len(RAMP)
     ramp_scale = (ramp_len - 1) / 255.0
 
+    enc = CompactEncoder(rle=compact) if compact else None
     lines: List[str] = []
     p = 0
 
     for y in range(out_height):
-        line_parts: List[str] = []
+        if enc:
+            enc.begin_line()
+        else:
+            line_parts: List[str] = []
+
         for x in range(out_width):
             r, g, b = pixels[p]
             p += 1
@@ -126,9 +143,17 @@ def image_to_ansi_ascii(img: Image.Image, out_width: int, dither: bool = True) -
             ch = RAMP[int(luma2 * ramp_scale)]
             col = nearest_pastel_ansi(r2, g2, b2)
 
-            line_parts.append(f"\x1b[38;5;{col}m{ch}")
+            if enc:
+                enc.put(ch, col)
+            else:
+                line_parts.append(f"\x1b[38;5;{col}m{ch}")
 
-        line_parts.append(ANSI_RESET)
-        lines.append("".join(line_parts))
+        if enc:
+            enc.end_line()
+        else:
+            line_parts.append(ANSI_RESET)
+            lines.append("".join(line_parts))
 
+    if enc:
+        return enc.finish()
     return "\n".join(lines) + ANSI_RESET + "\n"

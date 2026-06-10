@@ -1,0 +1,103 @@
+﻿FlowerOS FOTD - Colour Block Art Index
+FOTD = Flower Of The Day
+Generated: 2026-04-09 11:34:24
+
+Available ASCII Art Files:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+01:
+  - 01-small.ascii (60 cols)
+  - 01-medium.ascii (120 cols)
+  - 01-large.ascii (160 cols)
+  - 01-hash.ascii (hash mode)
+
+
+02:
+  - 02-small.ascii (60 cols)
+  - 02-medium.ascii (120 cols)
+  - 02-large.ascii (160 cols)
+  - 02-hash.ascii (hash mode)
+
+
+03:
+  - 03-small.ascii (60 cols)
+  - 03-medium.ascii (120 cols)
+  - 03-large.ascii (160 cols)
+  - 03-hash.ascii (hash mode)
+
+
+04:
+  - 04-small.ascii (60 cols)
+  - 04-medium.ascii (120 cols)
+  - 04-large.ascii (160 cols)
+  - 04-hash.ascii (hash mode)
+
+
+05:
+  - 05-small.ascii (60 cols)
+  - 05-medium.ascii (120 cols)
+  - 05-large.ascii (160 cols)
+  - 05-hash.ascii (hash mode)
+
+
+06:
+  - 06-small.ascii (60 cols)
+  - 06-medium.ascii (120 cols)
+  - 06-large.ascii (160 cols)
+  - 06-hash.ascii (hash mode)
+
+
+07:
+  - 07-small.ascii (60 cols)
+  - 07-medium.ascii (120 cols)
+  - 07-large.ascii (160 cols)
+  - 07-hash.ascii (hash mode)
+
+
+08:
+  - 08-small.ascii (60 cols)
+  - 08-medium.ascii (120 cols)
+  - 08-large.ascii (160 cols)
+  - 08-hash.ascii (hash mode)
+
+
+09:
+  - 09-small.ascii (60 cols)
+  - 09-medium.ascii (120 cols)
+  - 09-large.ascii (160 cols)
+  - 09-hash.ascii (hash mode)
+
+
+10:
+  - 10-small.ascii (60 cols)
+  - 10-medium.ascii (120 cols)
+  - 10-large.ascii (160 cols)
+  - 10-hash.ascii (hash mode)
+
+
+11:
+  - 11-small.ascii (60 cols)
+  - 11-medium.ascii (120 cols)
+  - 11-large.ascii (160 cols)
+  - 11-hash.ascii (hash mode)
+
+
+12:
+  - 12-small.ascii (60 cols)
+  - 12-medium.ascii (120 cols)
+  - 12-large.ascii (160 cols)
+  - 12-hash.ascii (hash mode)
+
+
+Usage:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+View ASCII art:
+  Get-Content motd/ascii-output/yourfile.ascii
+
+Use in welcome screen:
+  Copy-Item motd/ascii-output/yourfile.ascii features/v1.2/visual-experience/ascii/
+
+Preview all:
+  Get-ChildItem motd/ascii-output/*.ascii | ForEach-Object { Write-Host "=== $_ ==="; Get-Content $_; Write-Host "" }
+

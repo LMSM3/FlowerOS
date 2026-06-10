@@ -1,0 +1,331 @@
+#!/usr/bin/env bash
+# ═══════════════════════════════════════════════════════════════════════════
+#  flower-theme-sync  —  Apply FlowerOS theme across bash + PowerShell
+#
+#  Usage:
+#    flower-theme-sync                   Show status
+#    flower-theme-sync apply <theme>     Apply theme everywhere
+#    flower-theme-sync push              Push theme files WSL -> Windows
+#    flower-theme-sync install-omp       Install Oh My Posh
+#    flower-theme-sync inject-bash       Append source line to ~/.bashrc
+#    flower-theme-sync inject-pwsh       Show $PROFILE snippet for PowerShell
+#    flower-theme-sync --help            This message
+#
+#  Part of FlowerOS 0.4.0 (Pollen) — Core Architecture.
+# ═══════════════════════════════════════════════════════════════════════════
+
+set -uo pipefail
+
+# ── Resolve root ─────────────────────────────────────────────────────────
+_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+FLOWEROS_ROOT="$(cd "$_DIR/.." 2>/dev/null && pwd)"
+export FLOWEROS_ROOT
+FLOWEROS_LIB="${FLOWEROS_ROOT}/lib"
+
+# ── Colors ───────────────────────────────────────────────────────────────
+G='\033[32m' R='\033[31m' C='\033[36m' Y='\033[33m'
+M='\033[35m' D='\033[90m' B='\033[1m'  Z='\033[0m'
+
+# ── Helpers ──────────────────────────────────────────────────────────────
+ok()   { printf "${G}✓${Z} %s\n" "$*"; }
+err()  { printf "${R}✗${Z} %s\n" "$*" >&2; }
+info() { printf "${C}✿${Z} %s\n" "$*"; }
+warn() { printf "${Y}⚠${Z} %s\n" "$*"; }
+
+banner() {
+    echo ""
+    printf "${M}═══════════════════════════════════════════════════════════════════${Z}\n"
+    printf "${M}  ${B}🌿 flower-theme-sync${Z}${M}  —  FlowerOS Profile Colour Sync${Z}\n"
+    printf "${M}═══════════════════════════════════════════════════════════════════${Z}\n"
+    echo ""
+}
+
+# ═══════════════════════════════════════════════════════════════════════════
+#  Commands
+# ═══════════════════════════════════════════════════════════════════════════
+
+cmd_status() {
+    banner
+
+    # Distro
+    if [[ -f /etc/os-release ]]; then
+        # shellcheck source=/dev/null
+        . /etc/os-release
+        printf "  ${C}Distro:${Z}       %s (%s)\n" "${PRETTY_NAME:-$ID}" "${ID:-unknown}"
+    else
+        printf "  ${C}Distro:${Z}       unknown\n"
+    fi
+
+    # Theme loaded
+    printf "  ${C}Theme:${Z}        %s\n" "${FLOWEROS_THEME_LOADED:-not loaded}"
+
+    # Theme variant
+    printf "  ${C}Variant:${Z}      %s\n" "${FLOWEROS_THEME_VARIANT:-dark}"
+
+    # OMP colours in env?
+    if [[ -n "${FLOWEROS_OMP_PRIMARY:-}" ]]; then
+        printf "  ${C}OMP palette:${Z}  synced (primary=${FLOWEROS_OMP_PRIMARY})\n"
+    else
+        printf "  ${C}OMP palette:${Z}  ${Y}not synced — source profile_sync.sh first${Z}\n"
+    fi
+
+    # WSLENV
+    if [[ -n "${WSLENV:-}" ]]; then
+        local count
+        count=$(echo "$WSLENV" | tr ':' '\n' | grep -c FLOWEROS || true)
+        printf "  ${C}WSLENV:${Z}       %d FlowerOS vars shared\n" "$count"
+    else
+        printf "  ${C}WSLENV:${Z}       ${Y}not set${Z}\n"
+    fi
+
+    # Manifest
+    local manifest="${HOME}/.floweros/theme_sync.env"
+    if [[ -f "$manifest" ]]; then
+        local age
+        age=$(( $(date +%s) - $(stat -c %Y "$manifest" 2>/dev/null || echo 0) ))
+        printf "  ${C}Manifest:${Z}     %s (age: %ds)\n" "$manifest" "$age"
+    else
+        printf "  ${C}Manifest:${Z}     ${Y}not yet written${Z}\n"
+    fi
+
+    # Oh My Posh
+    if command -v oh-my-posh >/dev/null 2>&1; then
+        printf "  ${C}OMP:${Z}          %s\n" "$(oh-my-posh --version 2>/dev/null || echo 'installed')"
+    else
+        printf "  ${C}OMP:${Z}          ${Y}not installed${Z}\n"
+    fi
+
+    # OMP theme file
+    local omp_config="${FLOWEROS_LIB}/floweros.omp.json"
+    if [[ -f "$omp_config" ]]; then
+        printf "  ${C}OMP config:${Z}   %s\n" "$omp_config"
+    else
+        printf "  ${C}OMP config:${Z}   ${R}missing${Z}\n"
+    fi
+
+    echo ""
+
+    # Palette preview
+    if [[ -n "${FLOWEROS_OMP_PRIMARY:-}" ]]; then
+        printf "  ${Y}── Palette ──${Z}\n"
+        printf "  ${D}  Primary:   ${Z}%s\n" "${FLOWEROS_OMP_PRIMARY}"
+        printf "  ${D}  Secondary: ${Z}%s\n" "${FLOWEROS_OMP_SECONDARY}"
+        printf "  ${D}  Accent:    ${Z}%s\n" "${FLOWEROS_OMP_ACCENT}"
+        printf "  ${D}  Warning:   ${Z}%s\n" "${FLOWEROS_OMP_WARNING}"
+        printf "  ${D}  Error:     ${Z}%s\n" "${FLOWEROS_OMP_ERROR}"
+        printf "  ${D}  Success:   ${Z}%s\n" "${FLOWEROS_OMP_SUCCESS}"
+        printf "  ${D}  Info:      ${Z}%s\n" "${FLOWEROS_OMP_INFO}"
+        printf "  ${D}  Muted:     ${Z}%s\n" "${FLOWEROS_OMP_MUTED}"
+        echo ""
+    fi
+}
+
+cmd_apply() {
+    local theme="${1:-}"
+    if [[ -z "$theme" ]]; then
+        echo "Usage: flower-theme-sync apply <garden|spring|autumn|night>"
+        return 1
+    fi
+    banner
+
+    info "Applying theme: ${theme}"
+    echo ""
+
+    # Source the sync engine (this loads theme + exports + WSLENV + OMP)
+    source "${FLOWEROS_LIB}/profile_sync.sh"
+
+    # Apply the requested theme
+    if declare -f flower_profile_apply >/dev/null 2>&1; then
+        flower_profile_apply "$theme"
+    else
+        err "flower_profile_apply not available"
+        return 1
+    fi
+
+    echo ""
+    ok "Theme '${theme}' applied to bash session"
+    ok "WSLENV variables exported for PowerShell"
+    ok "Sync manifest written"
+
+    # Push theme files to Windows via Pollen file-push
+    local push_script="${_DIR}/flower-theme-push"
+    if [[ -x "$push_script" ]]; then
+        echo ""
+        info "Pushing theme files to Windows..."
+        "$push_script" 2>/dev/null || warn "File push had warnings (non-fatal)"
+    fi
+
+    echo ""
+    info "PowerShell side: restart terminal or run:"
+    printf "  ${C}. \"\$env:FLOWEROS_ROOT\\lib\\profile_sync.ps1\"${Z}\n"
+    echo ""
+}
+
+cmd_push() {
+    # Delegate to the dedicated Pollen 0.4.0 file-push script
+    local push_script="${_DIR}/flower-theme-push"
+    if [[ -x "$push_script" ]]; then
+        exec "$push_script" "$@"
+    else
+        err "flower-theme-push not found at $push_script"
+        return 1
+    fi
+}
+
+cmd_install_omp() {
+    banner
+
+    if command -v oh-my-posh >/dev/null 2>&1; then
+        ok "oh-my-posh already installed: $(oh-my-posh --version 2>/dev/null)"
+        return 0
+    fi
+
+    # Detect distro
+    local distro=""
+    if [[ -f /etc/os-release ]]; then
+        # shellcheck source=/dev/null
+        . /etc/os-release
+        distro="${ID:-}"
+    fi
+
+    info "Detected distro: ${distro:-unknown}"
+
+    case "$distro" in
+        ubuntu|pop)
+            info "Ubuntu/Pop!_OS — using official install script"
+            ;;
+        debian)
+            info "Debian — using official install script"
+            if ! command -v curl >/dev/null 2>&1; then
+                warn "curl not found, installing..."
+                sudo apt update && sudo apt install -y curl
+            fi
+            ;;
+        fedora|rhel|centos|rocky|alma)
+            info "RHEL family — using official install script"
+            ;;
+        arch|manjaro|endeavouros)
+            info "Arch family — using official install script"
+            ;;
+        *)
+            info "Generic — using official install script"
+            ;;
+    esac
+
+    echo ""
+    curl -s https://ohmyposh.dev/install.sh | bash -s -- -d ~/.local/bin
+    export PATH="${HOME}/.local/bin:${PATH}"
+
+    if command -v oh-my-posh >/dev/null 2>&1; then
+        ok "Installed: $(oh-my-posh --version)"
+    else
+        warn "Binary installed but not in PATH"
+        echo "  Add to ~/.bashrc:  export PATH=\"\$HOME/.local/bin:\$PATH\""
+    fi
+
+    echo ""
+    info "Ensure your terminal uses a Nerd Font for icons"
+    info "  Recommended: 'FiraCode Nerd Font' or 'CaskaydiaCove Nerd Font'"
+}
+
+cmd_inject_bash() {
+    banner
+
+    local bashrc="${HOME}/.bashrc"
+    local marker="# >>> FlowerOS profile sync >>>"
+
+    if grep -qF "$marker" "$bashrc" 2>/dev/null; then
+        ok "FlowerOS profile sync already in ${bashrc}"
+        return 0
+    fi
+
+    info "Appending FlowerOS profile sync to ${bashrc}..."
+    cat >> "$bashrc" << BLOCK
+
+${marker}
+export FLOWEROS_ROOT="${FLOWEROS_ROOT}"
+[ -f "\$FLOWEROS_ROOT/lib/profile_sync.sh" ] && source "\$FLOWEROS_ROOT/lib/profile_sync.sh"
+# <<< FlowerOS profile sync <<<
+BLOCK
+
+    ok "Added to ${bashrc}"
+    info "Reload: source ~/.bashrc"
+}
+
+cmd_inject_pwsh() {
+    banner
+
+    echo "Add the following to your PowerShell \$PROFILE:"
+    echo ""
+    printf "  ${C}# --- FlowerOS Profile Sync ---${Z}\n"
+    printf "  ${C}\$env:FLOWEROS_ROOT = \"${FLOWEROS_ROOT}\"${Z}\n"
+
+    # Convert to Windows path if we're in WSL
+    local win_root="$FLOWEROS_ROOT"
+    if [[ "$FLOWEROS_ROOT" == /mnt/* ]]; then
+        # /mnt/c/R/FlowerOS → C:\R\FlowerOS
+        local drive
+        drive=$(echo "$FLOWEROS_ROOT" | sed 's|^/mnt/\(.\)/.*|\1|')
+        local rest
+        rest=$(echo "$FLOWEROS_ROOT" | sed "s|^/mnt/.||" | tr '/' '\\')
+        win_root="${drive^^}:${rest}"
+    fi
+
+    printf "  ${C}\$env:FLOWEROS_ROOT = \"${win_root}\"${Z}\n"
+    printf "  ${C}. \"\$env:FLOWEROS_ROOT\\lib\\profile_sync.ps1\"${Z}\n"
+    echo ""
+    echo "To open your profile:"
+    printf "  ${C}notepad \$PROFILE${Z}   ${D}# or: code \$PROFILE${Z}\n"
+    echo ""
+    echo "If \$PROFILE doesn't exist yet:"
+    printf "  ${C}New-Item -Path \$PROFILE -ItemType File -Force${Z}\n"
+    echo ""
+}
+
+cmd_help() {
+    banner
+    printf "${Y}── USAGE ──${Z}\n\n"
+    printf "  ${C}flower-theme-sync${Z}                   Show current status\n"
+    printf "  ${C}flower-theme-sync apply <theme>${Z}     Apply theme (garden|spring|autumn|night)\n"
+    printf "  ${C}flower-theme-sync push${Z}              Push theme files WSL -> Windows\n"
+    printf "  ${C}flower-theme-sync push --status${Z}     Show file sync status\n"
+    printf "  ${C}flower-theme-sync push --generate${Z}   Regenerate config files\n"
+    printf "  ${C}flower-theme-sync install-omp${Z}       Install Oh My Posh\n"
+    printf "  ${C}flower-theme-sync inject-bash${Z}       Add source line to ~/.bashrc\n"
+    printf "  ${C}flower-theme-sync inject-pwsh${Z}       Show \$PROFILE snippet\n"
+    printf "  ${C}flower-theme-sync --help${Z}            This message\n"
+    echo ""
+    printf "${Y}── ARCHITECTURE (Pollen 0.4.0) ──${Z}\n\n"
+    printf "  ${D}Theme Applied${Z}\n"
+    printf "  ${D}  ├─ lib/profile_sync.sh      bash: load .theme -> WSLENV -> OMP${Z}\n"
+    printf "  ${D}  ├─ lib/profile_sync.ps1     pwsh: read WSLENV/manifest -> OMP${Z}\n"
+    printf "  ${D}  ├─ lib/floweros.omp.json    shared OMP template (reads env palette)${Z}\n"
+    printf "  ${D}  ├─ bin/flower-theme-push     file-push WSL -> Windows${Z}\n"
+    printf "  ${D}  └─ ~/.config/flower/         canonical config directory${Z}\n"
+    printf "  ${D}       ├─ theme.omp.json       OMP theme (env-driven palette)${Z}\n"
+    printf "  ${D}       ├─ state.ps1            PowerShell profile loader${Z}\n"
+    printf "  ${D}       ├─ theme.env            key=value colour manifest${Z}\n"
+    printf "  ${D}       └─ swarm.toml           multi-node config (reserved)${Z}\n"
+    echo ""
+    printf "${Y}── QUICK START ──${Z}\n\n"
+    printf "  ${C}flower-theme-sync inject-bash${Z}     ${D}# one-time: hook into ~/.bashrc${Z}\n"
+    printf "  ${C}flower-theme-sync inject-pwsh${Z}     ${D}# one-time: shows \$PROFILE snippet${Z}\n"
+    printf "  ${C}flower-theme-sync install-omp${Z}     ${D}# one-time: install Oh My Posh${Z}\n"
+    printf "  ${C}flower-theme-sync apply garden${Z}    ${D}# switch theme + auto-push${Z}\n"
+    printf "  ${C}flower-theme-sync push${Z}            ${D}# manual file push${Z}\n"
+    echo ""
+}
+
+# ═══════════════════════════════════════════════════════════════════════════
+#  Dispatch
+# ═══════════════════════════════════════════════════════════════════════════
+
+case "${1:-}" in
+    apply)       cmd_apply "${2:-}" ;;
+    push)        shift; cmd_push "$@" ;;
+    install-omp) cmd_install_omp ;;
+    inject-bash) cmd_inject_bash ;;
+    inject-pwsh) cmd_inject_pwsh ;;
+    -h|--help|help) cmd_help ;;
+    *)           cmd_status ;;
+esac

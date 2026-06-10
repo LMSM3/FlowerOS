@@ -156,7 +156,15 @@ main() {
     [[ -x ./flower-play ]] && ok "Built: flower-play ($(du -h flower-play | cut -f1))"
   fi
 
-  # 12. Optional: Build network components (v1.3.X experimental)
+  # 12. PNG-to-terminal colour block renderer (MOTD art)
+  if [[ -f "src/utils/png2term.c" ]]; then
+    info "[12] Building png2term (PNG → terminal colour blocks)..."
+    gcc $CFLAGS $FEATURES -o png2term src/utils/png2term.c -lm -lz 2>/dev/null || \
+      warn "Failed to compile png2term (needs zlib-dev, optional, skipping)"
+    [[ -x ./png2term ]] && ok "Built: png2term ($(du -h png2term | cut -f1))"
+  fi
+
+  # 13. Optional: Build network components (v1.3.X experimental)
   if [[ -d "network" ]] && [[ -f "network/Makefile" ]]; then
     echo ""
     if command -v g++ >/dev/null 2>&1; then
@@ -173,7 +181,7 @@ main() {
   echo ""
   echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
   local core_count
-  core_count=$(ls -1 random animate banner fortune colortest fp flower-run 2>/dev/null | wc -l)
+  core_count=$(ls -1 random animate banner fortune colortest fp flower-run png2term 2>/dev/null | wc -l)
   local net_count=0
   [[ -f "network/build/node_monitor" ]] && net_count=$(ls -1 network/build/node_monitor network/build/node_discovery network/build/terminal_node 2>/dev/null | wc -l)
   ok "Build complete! $core_count core binaries + $net_count network binaries ready"

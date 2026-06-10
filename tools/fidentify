@@ -1,0 +1,486 @@
+#!/usr/bin/env python3
+# ═══════════════════════════════════════════════════════════════════════════
+#  FlowerOS — fidentify  (tools/fidentify)
+#
+#  Quick-summon plant identifier for active WSL bash sessions.
+#  Call from anywhere, at any time, to upload / point at an image
+#  and get an instant Calflora-backed identification.
+#
+#  Install (one-time, from WSL):
+#    chmod +x /mnt/c/R/FlowerOS/tools/fidentify
+#    ln -sf /mnt/c/R/FlowerOS/tools/fidentify ~/.local/bin/fidentify
+#
+#  Usage:
+#    fidentify                      Interactive — pick or drag-drop an image
+#    fidentify <image>              Identify one file
+#    fidentify <dir>                Identify every image in a directory
+#    fidentify --history            Re-identify from ascii_out/ history
+#    fidentify --search <term>      Quick DB lookup (no image needed)
+#    fidentify --color  <color>     DB lookup by bloom color
+#    fidentify --upload             Prompt for a file path to "upload"
+#    fidentify --watch <dir>        Watch a directory and identify new images
+#
+#  Part of FlowerOS v1.3.0 — Botanical Image Identification Subsystem.
+# ═══════════════════════════════════════════════════════════════════════════
+
+import hashlib
+import os
+import re
+import signal
+import sys
+import time
+from pathlib import Path
+from typing import List, Optional
+
+# ── Resolve FlowerOS root (works from any CWD) ──────────────────────────
+_SCRIPT_DIR = Path(__file__).resolve().parent              # tools/
+_FLOWEROS_ROOT = _SCRIPT_DIR.parent                        # FlowerOS/
+_LIB_DIR = _FLOWEROS_ROOT / "lib"
+_TOOLS_DIR = _FLOWEROS_ROOT / "tools"
+_ASCII_OUT = _FLOWEROS_ROOT / "ascii_out"
+
+sys.path.insert(0, str(_LIB_DIR))
+sys.path.insert(0, str(_TOOLS_DIR))
+
+# ── Colors ───────────────────────────────────────────────────────────────
+RST = "\x1b[0m"
+BLD = "\x1b[1m"
+DIM = "\x1b[90m"
+RED = "\x1b[31m"
+GRN = "\x1b[32m"
+YLW = "\x1b[33m"
+BLU = "\x1b[34m"
+MAG = "\x1b[35m"
+CYN = "\x1b[36m"
+
+# ── Banners ──────────────────────────────────────────────────────────────
+try:
+    from banners import fos_banner_title, fos_banner_box
+except ImportError:
+    def fos_banner_title(*a, **kw): pass
+    def fos_banner_box(*a, **kw): pass
+
+# ── Core modules ─────────────────────────────────────────────────────────
+try:
+    import calflora_db
+except ImportError:
+    print(f"{RED}✗ Cannot import calflora_db — is tools/calflora_db.py present?{RST}")
+    sys.exit(1)
+
+try:
+    import plant_identify
+except ImportError:
+    print(f"{RED}✗ Cannot import plant_identify — is tools/plant_identify.py present?{RST}")
+    sys.exit(1)
+
+# ── Constants ────────────────────────────────────────────────────────────
+IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".bmp", ".gif", ".webp", ".tiff"}
+VERSION = "1.3.0"
+
+# ═══════════════════════════════════════════════════════════════════════════
+#  Helpers
+# ═══════════════════════════════════════════════════════════════════════════
+
+def _banner():
+    print()
+    print(f"{MAG}{'═' * 72}{RST}")
+    print(f"{MAG}  {BLD}🌿 fidentify{RST}{MAG}  —  FlowerOS Plant Identifier  (v{VERSION}){RST}")
+    print(f"{MAG}  {DIM}Summon anywhere in WSL · Calflora-backed · offline-ready{RST}")
+    print(f"{MAG}{'═' * 72}{RST}")
+    print()
+
+
+def _ensure_db() -> int:
+    """Seed the DB if needed, return taxon count."""
+    conn = calflora_db._ensure_db()
+    calflora_db.seed_database(conn)
+    total = conn.execute("SELECT COUNT(*) FROM taxa").fetchone()[0]
+    conn.close()
+    return total
+
+
+def _resolve_path(raw: str) -> Path:
+    """
+    Resolve a path that may be:
+      - A WSL path             /home/user/flower.jpg
+      - A Windows-via-WSL path /mnt/c/Users/.../flower.jpg
+      - A Windows path         C:\\Users\\...\\flower.jpg
+      - A drag-dropped path    'quoted /path/to/file'
+    """
+    s = raw.strip().strip("'\"")
+    if not s:
+        return Path()
+
+    # Windows drive letter → WSL mount  (C:\foo → /mnt/c/foo)
+    m = re.match(r'^([A-Za-z]):[/\\](.*)$', s)
+    if m:
+        drive = m.group(1).lower()
+        rest = m.group(2).replace("\\", "/")
+        return Path(f"/mnt/{drive}/{rest}")
+
+    return Path(s).expanduser()
+
+
+def _collect_images(paths: List[str]) -> List[Path]:
+    """Expand args into image file paths."""
+    out: List[Path] = []
+    for raw in paths:
+        p = _resolve_path(raw)
+        if p.is_dir():
+            out += sorted(
+                f for f in p.rglob("*")
+                if f.suffix.lower() in IMAGE_EXTS and f.is_file()
+            )
+        elif p.is_file() and p.suffix.lower() in IMAGE_EXTS:
+            out.append(p)
+        elif p.is_file():
+            # Might be an .ansi.txt from ascii_out — allow for keyword ID
+            out.append(p)
+        else:
+            print(f"  {YLW}⚠ Not found:{RST} {p}")
+    # de-dup
+    seen = set()
+    result = []
+    for p in out:
+        rp = str(p.resolve())
+        if rp not in seen:
+            seen.add(rp)
+            result.append(p)
+    return result
+
+
+def _identify_and_print(images: List[Path]) -> int:
+    """Run identification on a list of images. Returns count identified."""
+    identified = 0
+    for img in images:
+        results = plant_identify.identify_image(img)
+        plant_identify.print_identification(img, results)
+        if results:
+            identified += 1
+    return identified
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+#  Commands
+# ═══════════════════════════════════════════════════════════════════════════
+
+def cmd_interactive():
+    """Interactive mode — prompt for image path, loop until quit."""
+    _banner()
+    total = _ensure_db()
+    print(f"  {GRN}✓ Calflora DB ready — {total} taxa{RST}")
+    print()
+    print(f"  {CYN}Drag-and-drop an image path, or type it in.{RST}")
+    print(f"  {CYN}Commands: {BLD}q{RST}{CYN}/quit, {BLD}history{RST}{CYN}, "
+          f"{BLD}search <term>{RST}{CYN}, {BLD}color <color>{RST}")
+    print(f"  {DIM}Accepts WSL, Windows, or /mnt/ paths.{RST}")
+
+    while True:
+        print()
+        try:
+            raw = input(f"  {MAG}fidentify ❯{RST} ").strip()
+        except (EOFError, KeyboardInterrupt):
+            print(f"\n  {DIM}Goodbye 🌸{RST}\n")
+            break
+
+        if not raw:
+            continue
+        low = raw.lower()
+
+        # Quit
+        if low in ("q", "quit", "exit"):
+            print(f"  {DIM}Goodbye 🌸{RST}\n")
+            break
+
+        # History scan
+        if low == "history":
+            cmd_history()
+            continue
+
+        # Quick DB search
+        if low.startswith("search "):
+            term = raw[7:].strip()
+            cmd_search(term)
+            continue
+
+        # Color search
+        if low.startswith("color "):
+            color = raw[6:].strip()
+            cmd_color(color)
+            continue
+
+        # Help
+        if low in ("help", "?"):
+            _print_interactive_help()
+            continue
+
+        # Treat as file/dir path
+        images = _collect_images([raw])
+        if images:
+            _identify_and_print(images)
+        else:
+            print(f"  {YLW}⚠ No images found at that path.{RST}")
+            print(f"  {DIM}Tip: paste an absolute path, or try 'search <name>'{RST}")
+
+
+def _print_interactive_help():
+    print(f"""
+  {YLW}── fidentify Interactive Commands ──{RST}
+
+  {CYN}<path>{RST}             Identify image(s) at path
+  {CYN}search <term>{RST}     Search DB by plant name
+  {CYN}color <color>{RST}     Search DB by bloom color
+  {CYN}history{RST}           Re-identify from ascii_out/
+  {CYN}help{RST}              This message
+  {CYN}q / quit{RST}          Exit
+""")
+
+
+def cmd_identify(paths: List[str]):
+    """Direct identification of file/dir arguments."""
+    _banner()
+    total = _ensure_db()
+    print(f"  {GRN}✓ Calflora DB — {total} taxa{RST}")
+
+    images = _collect_images(paths)
+    if not images:
+        print(f"  {RED}✗ No images found.{RST}")
+        sys.exit(2)
+
+    print(f"  {CYN}Scanning {len(images)} image(s)...{RST}")
+    print(f"\n{MAG}{'═' * 72}{RST}")
+
+    identified = _identify_and_print(images)
+
+    print(f"\n{MAG}{'═' * 72}{RST}")
+    print(f"  {CYN}🌸 Identified {identified}/{len(images)} image(s){RST}")
+    print(f"  {DIM}DB: {calflora_db.DB_PATH}{RST}\n")
+
+
+def cmd_history():
+    """Re-identify everything in ascii_out/."""
+    total = _ensure_db()
+    if not _ASCII_OUT.is_dir():
+        print(f"  {YLW}⚠ ascii_out/ not found at {_ASCII_OUT}{RST}")
+        return
+
+    ansi_files = sorted(_ASCII_OUT.glob("*.ansi.txt"))
+    if not ansi_files:
+        print(f"  {YLW}⚠ No .ansi.txt files in ascii_out/{RST}")
+        return
+
+    # Also try to locate original image files
+    originals = plant_identify.discover_originals_from_ascii_out()
+    all_targets = list(ansi_files) + originals
+
+    # de-dup
+    seen = set()
+    images: List[Path] = []
+    for p in all_targets:
+        rp = str(p.resolve())
+        if rp not in seen:
+            seen.add(rp)
+            images.append(p)
+
+    print(f"  {CYN}🔍 Re-identifying {len(images)} item(s) from ascii_out/...{RST}")
+    _identify_and_print(images)
+
+
+def cmd_search(term: str):
+    """Quick DB lookup by name."""
+    results = calflora_db.search_by_name(term)
+    if not results:
+        print(f"  {YLW}⚠ No taxa matching '{term}'{RST}")
+        return
+    print(f"  {GRN}Found {len(results)} match(es) for '{term}':{RST}")
+    for r in results:
+        colors = r.get("bloom_colors", "")
+        native = f"{GRN}native{RST}" if r.get("native") else f"{YLW}non-native{RST}"
+        print(f"    {BLD}{r['common_name']:30s}{RST}  "
+              f"{DIM}{r['scientific_name']:35s}{RST}  "
+              f"[{colors}]  {native}")
+
+
+def cmd_color(color: str):
+    """Quick DB lookup by bloom color."""
+    results = calflora_db.search_by_color(color)
+    if not results:
+        print(f"  {YLW}⚠ No taxa with bloom color '{color}'{RST}")
+        return
+    print(f"  {GRN}Found {len(results)} taxa with '{color}' blooms:{RST}")
+    for r in results:
+        print(f"    {BLD}{r['common_name']:30s}{RST}  "
+              f"{DIM}{r['scientific_name']:35s}{RST}  "
+              f"[{r.get('bloom_colors', '')}]")
+
+
+def cmd_upload():
+    """Prompt for a file path (simulates 'upload' in terminal context)."""
+    _banner()
+    total = _ensure_db()
+    print(f"  {GRN}✓ Calflora DB — {total} taxa{RST}")
+    print()
+    print(f"  {CYN}Paste or type the full path to your image:{RST}")
+    print(f"  {DIM}(WSL, Windows, or /mnt/ paths all work){RST}")
+    print()
+
+    try:
+        raw = input(f"  {MAG}image path ❯{RST} ").strip()
+    except (EOFError, KeyboardInterrupt):
+        print(f"\n  {DIM}Cancelled.{RST}")
+        return
+
+    if not raw:
+        print(f"  {YLW}⚠ No path given.{RST}")
+        return
+
+    images = _collect_images([raw])
+    if not images:
+        print(f"  {RED}✗ No image found at: {raw}{RST}")
+        return
+
+    print(f"\n{MAG}{'═' * 72}{RST}")
+    identified = _identify_and_print(images)
+    print(f"\n{MAG}{'═' * 72}{RST}")
+    print(f"  {CYN}🌸 Done — {identified} identified.{RST}\n")
+
+
+def cmd_watch(directory: str, interval: float = 2.0):
+    """Watch a directory for new images and auto-identify them."""
+    _banner()
+    total = _ensure_db()
+    print(f"  {GRN}✓ Calflora DB — {total} taxa{RST}")
+
+    watch_dir = _resolve_path(directory)
+    if not watch_dir.is_dir():
+        print(f"  {RED}✗ Not a directory: {watch_dir}{RST}")
+        sys.exit(2)
+
+    print(f"  {CYN}👁  Watching: {watch_dir}{RST}")
+    print(f"  {DIM}Press Ctrl+C to stop.{RST}")
+    print()
+
+    seen_hashes: set = set()
+    # Snapshot existing files
+    for f in watch_dir.iterdir():
+        if f.suffix.lower() in IMAGE_EXTS and f.is_file():
+            seen_hashes.add(str(f.resolve()))
+
+    def _sigint(sig, frame):
+        print(f"\n  {DIM}Watch stopped.{RST}\n")
+        sys.exit(0)
+    signal.signal(signal.SIGINT, _sigint)
+
+    while True:
+        for f in watch_dir.iterdir():
+            if f.suffix.lower() not in IMAGE_EXTS or not f.is_file():
+                continue
+            key = str(f.resolve())
+            if key in seen_hashes:
+                continue
+            # New image detected
+            seen_hashes.add(key)
+            print(f"  {GRN}🆕 New image detected:{RST} {f.name}")
+            results = plant_identify.identify_image(f)
+            plant_identify.print_identification(f, results)
+        time.sleep(interval)
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+#  Usage
+# ═══════════════════════════════════════════════════════════════════════════
+
+def print_usage():
+    _banner()
+    print(f"""  {YLW}── USAGE ──{RST}
+
+  {CYN}fidentify{RST}                      Interactive mode (REPL)
+  {CYN}fidentify <image>{RST}              Identify a single image
+  {CYN}fidentify <directory>{RST}          Identify all images in dir
+  {CYN}fidentify --upload{RST}             Prompt for image path
+  {CYN}fidentify --history{RST}            Re-identify from ascii_out/
+  {CYN}fidentify --watch <dir>{RST}        Watch dir for new images
+  {CYN}fidentify --search <term>{RST}      Quick DB search by name
+  {CYN}fidentify --color <color>{RST}      Quick DB search by bloom color
+  {CYN}fidentify --sync{RST}               Sync Calflora DB from API
+  {CYN}fidentify --help{RST}               This message
+
+  {YLW}── INSTALL ──{RST}
+
+  {DIM}# Make executable + symlink into PATH:{RST}
+  chmod +x {_SCRIPT_DIR}/fidentify
+  ln -sf {_SCRIPT_DIR}/fidentify ~/.local/bin/fidentify
+
+  {YLW}── PATH FORMATS ──{RST}
+
+  {DIM}WSL native:{RST}     /home/user/photos/flower.jpg
+  {DIM}Windows mount:{RST}  /mnt/c/Users/you/Pictures/iris.png
+  {DIM}Windows:{RST}        C:\\Users\\you\\Pictures\\iris.png
+  {DIM}Drag-drop:{RST}      Just drop the file into the terminal
+
+  {YLW}── EXAMPLES ──{RST}
+
+  fidentify ~/Downloads/poppy.jpg
+  fidentify /mnt/c/Users/liamm/Pictures/garden/
+  fidentify --watch ~/Downloads
+  fidentify --search iris
+  fidentify --color purple
+
+  {DIM}Database: {calflora_db.DB_PATH}{RST}
+""")
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+#  Entry Point
+# ═══════════════════════════════════════════════════════════════════════════
+
+def main():
+    args = sys.argv[1:]
+
+    # No args → interactive REPL
+    if not args:
+        cmd_interactive()
+        return
+
+    first = args[0].lower() if args else ""
+
+    if first in ("-h", "--help", "help"):
+        print_usage()
+
+    elif first == "--upload":
+        cmd_upload()
+
+    elif first == "--history":
+        _banner()
+        total = _ensure_db()
+        print(f"  {GRN}✓ Calflora DB — {total} taxa{RST}")
+        cmd_history()
+
+    elif first == "--search" and len(args) > 1:
+        _ensure_db()
+        cmd_search(" ".join(args[1:]))
+
+    elif first == "--color" and len(args) > 1:
+        _ensure_db()
+        cmd_color(args[1])
+
+    elif first == "--sync":
+        _banner()
+        print(f"  {YLW}🌱 Syncing Calflora database...{RST}")
+        total = calflora_db.sync(verbose=True)
+        print(f"  {GRN}✓ Database ready — {total} taxa{RST}\n")
+
+    elif first == "--watch" and len(args) > 1:
+        cmd_watch(args[1])
+
+    else:
+        # Everything else is treated as file/dir paths to identify
+        real_args = [a for a in args if not a.startswith("--")]
+        if real_args:
+            cmd_identify(real_args)
+        else:
+            print_usage()
+
+
+if __name__ == "__main__":
+    main()

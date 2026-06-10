@@ -112,14 +112,14 @@ $UtilSources = @(
 foreach ($util in $UtilSources) {
     $binary = [System.IO.Path]::GetFileNameWithoutExtension($util)
     $binaryExe = "$binary.exe"
-    
+
     if (Test-Path "$ROOT\src\utils\$util") {
         Write-Host "Compiling $util..." -ForegroundColor Cyan
-        
+
         & gcc -O2 -std=c11 -Wall -Wextra `
             -o "$ROOT\$binaryExe" `
             "$ROOT\src\utils\$util"
-        
+
         if ($LASTEXITCODE -eq 0 -and (Test-Path "$ROOT\$binaryExe")) {
             Write-Host "  ✓ $binary built" -ForegroundColor Green
             $BuildSuccess++
@@ -127,6 +127,24 @@ foreach ($util in $UtilSources) {
             Write-Host "  ✗ $binary failed" -ForegroundColor Red
             $BuildFailed++
         }
+    }
+}
+
+# png2term requires extra link flags (-lm -lz)
+if (Test-Path "$ROOT\src\utils\png2term.c") {
+    Write-Host "Compiling png2term.c (PNG → terminal colour blocks)..." -ForegroundColor Cyan
+
+    & gcc -O2 -std=c11 -Wall -Wextra `
+        -o "$ROOT\png2term.exe" `
+        "$ROOT\src\utils\png2term.c" `
+        -lm -lz
+
+    if ($LASTEXITCODE -eq 0 -and (Test-Path "$ROOT\png2term.exe")) {
+        Write-Host "  ✓ png2term built" -ForegroundColor Green
+        $BuildSuccess++
+    } else {
+        Write-Host "  ✗ png2term failed (needs zlib)" -ForegroundColor Yellow
+        $BuildFailed++
     }
 }
 
@@ -238,7 +256,7 @@ if ($BuildSuccess -gt 0) {
         Write-Host "  ✓ GPU Detection:     gpu-detect.exe" -ForegroundColor Green
     }
     
-    foreach ($util in @("random", "animate", "banner", "fortune", "colortest")) {
+    foreach ($util in @("random", "animate", "banner", "fortune", "colortest", "png2term")) {
         if (Test-Path "$ROOT\$util.exe") {
             Write-Host "  ✓ $($util.PadRight(16)): $util.exe" -ForegroundColor Green
         }

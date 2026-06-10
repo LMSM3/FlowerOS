@@ -1,0 +1,120 @@
+{
+  "source": {
+    "huggingface": "https://huggingface.co/KokoleKen/lain_model_RVC",
+    "github": "https://github.com/SuCicada/lain-voice-models",
+    "engine": "RVC (Retrieval-based Voice Conversion)",
+    "alt_engine": "so-vits-svc-4.0"
+  },
+  "models": {
+    "v1": {
+      "label": "v1 — Original Singing",
+      "short": "v1",
+      "type": "singing",
+      "has_index": false,
+      "notes": "Original singing baseline",
+      "listen_for": [
+        "stable vowels",
+        "decent melodic tracking",
+        "whether it gets fuzzy on higher notes"
+      ],
+      "baseline_scores": {
+        "speech_clarity": 3,
+        "pitch_accuracy": 4,
+        "singing_stability": 4,
+        "natural_tone": null,
+        "consonant_sharpness": null,
+        "artifacts_noise": null,
+        "overall_resemblance": null
+      }
+    },
+    "v2": {
+      "label": "v2 — Conversational (No Pitch)",
+      "short": "v2",
+      "type": "speech",
+      "has_index": false,
+      "notes": "Good for speech, bad for singing",
+      "listen_for": [
+        "natural spoken phrasing",
+        "whether melody collapses into monotone",
+        "whether it sounds dead when forced to sing"
+      ],
+      "baseline_scores": {
+        "speech_clarity": 5,
+        "pitch_accuracy": 1,
+        "singing_stability": 1,
+        "natural_tone": null,
+        "consonant_sharpness": null,
+        "artifacts_noise": null,
+        "overall_resemblance": null
+      }
+    },
+    "v3.1": {
+      "label": "v3.1 — Improved Singing + .index",
+      "short": "v3.1",
+      "type": "singing",
+      "has_index": true,
+      "notes": "Best singing candidate",
+      "listen_for": [
+        "stronger pitch retention",
+        "smoother sustained notes",
+        "better transitions between notes",
+        "whether the .index improves timbre consistency"
+      ],
+      "baseline_scores": {
+        "speech_clarity": 4,
+        "pitch_accuracy": 5,
+        "singing_stability": 5,
+        "natural_tone": null,
+        "consonant_sharpness": null,
+        "artifacts_noise": null,
+        "overall_resemblance": null
+      }
+    },
+    "arisu": {
+      "label": "Arisu v1.1 — Alternate Voice",
+      "short": "Arisu",
+      "type": "wildcard",
+      "has_index": false,
+      "author": "@minotaurox0832 (YouTube)",
+      "notes": "Alternate voice, compare by ear",
+      "listen_for": [
+        "whether the timbre is cleaner or more expressive",
+        "whether it handles feminine/bright tone better",
+        "whether it breaks under strong pitch movement"
+      ],
+      "baseline_scores": {
+        "speech_clarity": null,
+        "pitch_accuracy": null,
+        "singing_stability": null,
+        "natural_tone": null,
+        "consonant_sharpness": null,
+        "artifacts_noise": null,
+        "overall_resemblance": null
+      }
+    }
+  },
+  "clips": {
+    "A": { "label": "Speech",  "file": "A_speech.wav"  },
+    "B": { "label": "Singing", "file": "B_singing.wav" },
+    "C": { "label": "Mixed",   "file": "C_mixed.wav"   }
+  },
+  "test_order": [
+    { "model": "v2",    "clip": "A", "reason": "speech specialist" },
+    { "model": "v1",    "clip": "B", "reason": "older singing baseline" },
+    { "model": "v3.1",  "clip": "B", "reason": "improved singing model" },
+    { "model": "arisu", "clip": "A", "reason": "wildcard — speech" },
+    { "model": "arisu", "clip": "B", "reason": "wildcard — singing" }
+  ],
+  "conclusions": {
+    "best_speech":   "v2",
+    "best_singing":  "v3.1",
+    "baseline_singing": "v1",
+    "alternate_style":  "arisu"
+  },
+  "recommendations": {
+    "talking_dialogue_conversational_vc": "v2",
+    "actual_singing": "v3.1",
+    "compatibility_check_older_reference": "v1",
+    "extra_character_flavor_alternate_voice": "arisu"
+  }
+}

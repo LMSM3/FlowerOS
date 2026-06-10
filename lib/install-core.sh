@@ -314,11 +314,11 @@ fos_verify_checksum() {
 # Download a versioned FlowerOS release tarball, verify, and extract.
 #   fos_fetch_release <version> <dest_dir> [sha256]
 #
-#   version  — e.g. "v1.2.5.1"
+#   version  — e.g. "v1.3.0"
   #   dest_dir — directory to extract into (created if absent)
   #   sha256   — optional expected checksum
 fos_fetch_release() {
-  local version="${1:-v1.2.5.1}"
+  local version="${1:-v1.3.0}"
   local dest_dir="$2"
   local checksum="${3:-}"
 

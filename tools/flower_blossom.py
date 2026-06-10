@@ -10,12 +10,15 @@ View output with:
   cat ascii_out/file.ansi.txt
 or (recommended):
   less -R ascii_out/file.ansi.txt
+
+Flags:
+  --identify   After conversion, identify plants via Calflora DB
 """
 
 import sys
 from pathlib import Path
 
-# Add lib to path for banner library
+# Add lib to path for banner + compact encoding libraries
 sys.path.insert(0, str(Path(__file__).parent.parent / "lib"))
 
 try:
@@ -36,6 +39,8 @@ except ImportError:
     print(f"{_FOS_YELLOW}Install: python3 -m pip install pillow{_FOS_RESET}")
     print(f"{_FOS_CYAN}Or: sudo apt-get install python3-pil{_FOS_RESET}")
     sys.exit(1)
+
+from compact_encoding import CompactEncoder, encode_fca, decode_fca, encoding_stats
 
 # ═══════════════════════════════════════════════════════════════════════════
 #  FlowerOS Configuration
@@ -79,11 +84,13 @@ def color_for_luma(luma: int) -> int:
     return PASTEL[idx]
 
 
-def image_to_ansi_ascii(img: Image.Image, out_width: int) -> str:
+def image_to_ansi_ascii(img: Image.Image, out_width: int, *, compact: bool = True) -> str:
     """
     Convert PIL Image to ANSI-colored ASCII art.
-    
+
     This is the "blooming" process - transforming pixels into characters.
+    Uses the compact encoding kernel when compact=True (default) to
+    eliminate redundant ANSI escape codes via delta-colour + RLE.
     """
     gray = img.convert("L")
     w, h = gray.size
@@ -99,6 +106,22 @@ def image_to_ansi_ascii(img: Image.Image, out_width: int) -> str:
     pixels = list(gray.getdata())
     scale = (len(RAMP) - 1) / 255.0
 
+    # Compact encoding path — delta colour + run-length
+    if compact:
+        enc = CompactEncoder(rle=True)
+        p = 0
+        for _ in range(out_height):
+            enc.begin_line()
+            for _ in range(out_width):
+                luma = pixels[p]
+                p += 1
+                ch  = RAMP[int(luma * scale)]
+                col = color_for_luma(luma)
+                enc.put(ch, col)
+            enc.end_line()
+        return enc.finish()
+
+    # Naive fallback (one escape per cell)
     lines = []
     p = 0
     for _ in range(out_height):
@@ -203,11 +226,16 @@ def main():
         print_help()
         sys.exit(0 if len(sys.argv) < 2 else 0)
 
+    # Check for --identify flag
+    raw_args = list(sys.argv[1:])
+    do_identify = "--identify" in raw_args
+    raw_args = [a for a in raw_args if a != "--identify"]
+
     print_banner()
 
     # Collect all images ("gathering seeds")
     print(f"{_FOS_YELLOW}🌱 Gathering images...{_FOS_RESET}")
-    images = collect_images(sys.argv[1:])
+    images = collect_images(raw_args)
 
     if not images:
         fos_status_fail("No images found")
@@ -247,18 +275,38 @@ def main():
     # Process each image ("blooming" process)
     success_count = 0
     fail_count = 0
-    
+    total_naive = 0
+    total_compact = 0
+
     for i, img_path in enumerate(images, 1):
         try:
             with Image.open(img_path) as im:
-                ansi = image_to_ansi_ascii(im, out_width)
+                # Compact-encoded ANSI output (delta colour + RLE)
+                ansi = image_to_ansi_ascii(im, out_width, compact=True)
+                # Also generate naive size for comparison stats
+                naive = image_to_ansi_ascii(im, out_width, compact=False)
 
             out_path = out_dir / f"{img_path.stem}.ansi.txt"
             out_path.write_text(ansi, encoding="utf-8")
 
-            print(f"{ANSI_GREEN}✓ [{i}/{len(images)}]{ANSI_RESET} {img_path.name} → {out_path.name}")
+            # Optional: write .fca compact binary alongside
+            fca_path = out_dir / f"{img_path.stem}.fca"
+            gray = Image.open(img_path).convert("L")
+            w, h = gray.size
+            aspect = h / w
+            oh = max(1, int(aspect * out_width * 0.55))
+            gray = gray.resize((out_width, oh))
+            px = list(gray.getdata())
+            cols = [color_for_luma(l) for l in px]
+            fca_path.write_bytes(encode_fca(px, cols, out_width, oh, RAMP))
+
+            total_naive += len(naive.encode("utf-8"))
+            total_compact += len(ansi.encode("utf-8"))
+
+            stats = encoding_stats(len(naive.encode("utf-8")), len(ansi.encode("utf-8")))
+            print(f"{ANSI_GREEN}✓ [{i}/{len(images)}]{ANSI_RESET} {img_path.name} → {out_path.name}  {stats}")
             success_count += 1
-            
+
         except Exception as e:
             print(f"{ANSI_RED}✗ [{i}/{len(images)}]{ANSI_RESET} FAILED {img_path.name}: {e}")
             fail_count += 1
@@ -273,6 +321,8 @@ def main():
     if fail_count > 0:
         print(f"  {ANSI_RED}✗ Failed:{ANSI_RESET}  {fail_count} image(s)")
     print(f"  {ANSI_CYAN}📁 Output:{ANSI_RESET}  {out_dir}/")
+    if total_naive > 0:
+        print(f"  {ANSI_CYAN}📦 Encoding:{ANSI_RESET} {encoding_stats(total_naive, total_compact)}")
     print()
     print(f"{ANSI_YELLOW}View with:{ANSI_RESET}")
     print(f"  less -R ascii_out/*.ansi.txt")
@@ -282,6 +332,37 @@ def main():
     
     print(f"{ANSI_GREEN}Every image is a seed waiting to bloom into ASCII art. 🌸{ANSI_RESET}")
     print()
+
+    # --- Plant Identification (Calflora DB) ---
+    if do_identify:
+        try:
+            import plant_identify
+            import calflora_db
+
+            print()
+            print(f"{ANSI_CYAN}🌿 Running plant identification via Calflora DB...{ANSI_RESET}")
+            print()
+
+            # Ensure DB is seeded
+            conn = calflora_db._ensure_db()
+            calflora_db.seed_database(conn)
+            total = conn.execute("SELECT COUNT(*) FROM taxa").fetchone()[0]
+            conn.close()
+            print(f"{ANSI_GREEN}✓ Calflora DB loaded — {total} taxa{ANSI_RESET}")
+
+            identified = 0
+            for img_path in images:
+                results = plant_identify.identify_image(img_path)
+                plant_identify.print_identification(img_path, results)
+                if results:
+                    identified += 1
+
+            print()
+            print(f"{ANSI_CYAN}🌸 Identified {identified}/{len(images)} image(s){ANSI_RESET}")
+
+        except ImportError as e:
+            print(f"{ANSI_RED}✗ Identification unavailable: {e}{ANSI_RESET}")
+            print(f"{ANSI_YELLOW}  Ensure calflora_db.py and plant_identify.py are in tools/{ANSI_RESET}")
 
 
 if __name__ == "__main__":

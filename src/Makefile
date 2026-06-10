@@ -33,7 +33,8 @@ BINS = \
 	flower-colony \
 	flower-td \
 	flower-play \
-	fp
+	fp \
+	png2term
 
 # ── Sources ──────────────────────────────────────────────────────────────────
 
@@ -51,8 +52,10 @@ flower-colony_SRC     = games/colony_engine.c
 flower-td_SRC         = games/td_engine.c
 flower-play_SRC       = games/play.c
 fp_SRC                = publish/fp.c
+png2term_SRC          = utils/png2term.c
+png2term_LDFLAGS      = -lm -lz
 
-# ── Rules ────────────────────────────────────────────────────────────────────
+# ── Rules
 
 .PHONY: all clean install uninstall list
 
@@ -61,7 +64,7 @@ all: $(BINS)
 define COMPILE_RULE
 $(1): $$($(1)_SRC) floweros.h
 	@printf '\033[36m🌱 %-20s\033[0m %s\n' "$(1)" "$$<"
-	$(CC) $(CFLAGS) -o $$@ $$< $(LDFLAGS)
+	$(CC) $(CFLAGS) -o $$@ $$< $(LDFLAGS) $$($(1)_LDFLAGS)
 	@printf '\033[32m✓ built: %-18s\033[0m (%s)\n' "$(1)" "$$(du -h $$@ | cut -f1)"
 endef
 
@@ -103,5 +106,6 @@ list:
 		"games/colony.sh"             "flower-colony"       "Colony survival (hex/cadence)" \
 		"games/td.sh"                 "flower-td"           "Tower defense (garden vs bugs)" \
 		"games/play.c"                "flower-play"         "Game launcher menu" \
-		"src/publish/fp.c"            "fp"                  "LaTeX workflow"
+		"src/publish/fp.c"            "fp"                  "LaTeX workflow" \
+		"img2term.sh / img2term-hash.py" "png2term"           "PNG → terminal colour blocks"
 	@echo ""

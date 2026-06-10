@@ -1,31 +1,32 @@
 #!/usr/bin/env bash
 # ═══════════════════════════════════════════════════════════════════════════
-#  share/motd/flower-motd.sh  —  FlowerOS MOTD  (Layer 0)
+#  share/motd/flower-motd.sh  —  FlowerOS FOTD  (Layer 0)
+#  FOTD = Flower Of The Day
 #
-#  Prints: ASCII mascot | system info (side-by-side), colour palette,
+#  Prints: colour-block art | system info (side-by-side), colour palette,
 #          one random 🌸 science fact (pure-bash, no python needed).
 #
 #  Layer 1 (inject.d/*.sh) and Layer 2 (py/provider_*.py) are appended
 #  at the bottom when the inject framework is present and env flags are set.
 #
 #  Install:  ./bin/flower-motd-install.sh
-#  Silence:  export FLOWER_MOTD_QUIET=1
+#  Silence:  export FLOWER_FOTD_QUIET=1  (FLOWER_MOTD_QUIET still works)
 # ═══════════════════════════════════════════════════════════════════════════
 set -euo pipefail
 shopt -s extglob   # required for ANSI-strip pattern *([0-9;])
 
 # Interactive-only guard
 case "$-" in *i*) ;; *) exit 0 ;; esac
-[[ -n "${FLOWER_MOTD_QUIET:-}" ]] && exit 0
+[[ -n "${FLOWER_FOTD_QUIET:-}${FLOWER_MOTD_QUIET:-}" ]] && exit 0
 
 have() { command -v "$1" >/dev/null 2>&1; }
 
 # ── Cache infrastructure ─────────────────────────────────────────────────
 # run_cached <name> <ttl_seconds> <command...>
-# Writes command stdout to ~/.cache/floweros/motd/<name>.txt.
+# Writes command stdout to ~/.cache/floweros/fotd/<name>.txt.
 # On cache hit (file exists and age < ttl) serves from disk — no exec.
 # On miss/stale: runs fresh; on failure, serves stale rather than nothing.
-_CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/floweros/motd"
+_CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/floweros/fotd"
 
 run_cached() {
     local name="$1" ttl="$2"
@@ -67,9 +68,9 @@ _run_widget() {
 }
 
 # ── Python lib path (dev fallback: run from source tree without install) ──
-_MOTD_PY_LIB="/usr/local/lib/floweros/motd/py"
+_MOTD_PY_LIB="/usr/local/lib/floweros/fotd/py"
+_script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 if [[ ! -d "$_MOTD_PY_LIB" ]]; then
-    _script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
     [[ -d "$_script_dir/py" ]] && _MOTD_PY_LIB="$_script_dir/py"
 fi
 
@@ -169,8 +170,8 @@ _MOTD_COLS="$(tput cols 2>/dev/null || echo 90)"
 (( _MOTD_COLS < 60 )) && _MOTD_COLS=60
 (( _MOTD_COLS > 120 )) && _MOTD_COLS=120
 
-# ASCII-safe icons by default.  Set FLOWER_MOTD_EMOJI=1 to enable emoji.
-if [[ "${FLOWER_MOTD_EMOJI:-0}" == "1" ]]; then
+# ASCII-safe icons by default.  Set FLOWER_FOTD_EMOJI=1 to enable emoji.
+if [[ "${FLOWER_FOTD_EMOJI:-${FLOWER_MOTD_EMOJI:-0}}" == "1" ]]; then
     _I_ELEM="⚗"; _I_CHEM="🧪"; _I_PLANT="🌱"
     _I_WX="🌦";   _I_STK="💹";   _I_NEWS="🗞"
 else
@@ -239,16 +240,53 @@ _fact_idx=$(( RANDOM % ${#_FACTS[@]} ))
 _random_fact="${_FACTS[$_fact_idx]}"
 
 # ── Character art via flower_guy system ─────────────────────────────────
-# Priority: compiled flower-guy binary → Python provider → fallback art.
+# Priority: png2term (native C) → compiled flower-guy binary → Python provider → fallback art.
 # Cached 1 h so the same character is shown all session.
 
 _char_art=()
 _PY_CHAR="$_MOTD_PY_LIB/provider_character.py"
 _char_raw=""
-if have flower-guy; then
-    _char_raw="$(run_cached character 3600 flower-guy --random 2>/dev/null || true)"
-elif [[ -f "$_PY_CHAR" ]]; then
-    _char_raw="$(run_cached character 3600 python3 "$_PY_CHAR" 2>/dev/null || true)"
+
+# ── png2term: native C colour-block renderer ────────────────────────────
+# Looks for PNG source images in motd/Import/ or pre-rendered .ascii files
+# in motd/ascii-output/.  Prefers on-the-fly rendering when the binary
+# and a source PNG exist; falls back to pre-rendered .ascii otherwise.
+_PNG2TERM=""
+if have png2term; then
+    _PNG2TERM="png2term"
+elif [[ -x "$_script_dir/../../png2term" ]]; then
+    _PNG2TERM="$_script_dir/../../png2term"
+fi
+
+_IMPORT_DIR="${_script_dir:+${_script_dir}/../../motd/Import}"
+_ASCII_DIR="${_script_dir:+${_script_dir}/../../motd/ascii-output}"
+
+if [[ -n "$_PNG2TERM" && -d "$_IMPORT_DIR" ]]; then
+    # Pick a random PNG from motd/Import/
+    _png_files=( "$_IMPORT_DIR"/*.png )
+    if [[ ${#_png_files[@]} -gt 0 && -f "${_png_files[0]}" ]]; then
+        _png_idx=$(( RANDOM % ${#_png_files[@]} ))
+        _png_pick="${_png_files[$_png_idx]}"
+        _char_raw="$(run_cached character 3600 "$_PNG2TERM" "$_png_pick" "$_GUTTER" 0.55 2>/dev/null || true)"
+    fi
+fi
+
+# Fallback: pre-rendered .ascii files (small = _GUTTER width)
+if [[ -z "$_char_raw" && -d "$_ASCII_DIR" ]]; then
+    _ascii_files=( "$_ASCII_DIR"/*-small.ascii )
+    if [[ ${#_ascii_files[@]} -gt 0 && -f "${_ascii_files[0]}" ]]; then
+        _ascii_idx=$(( RANDOM % ${#_ascii_files[@]} ))
+        _char_raw="$(cat "${_ascii_files[$_ascii_idx]}" 2>/dev/null || true)"
+    fi
+fi
+
+# Fallback: flower-guy binary → Python provider
+if [[ -z "$_char_raw" ]]; then
+    if have flower-guy; then
+        _char_raw="$(run_cached character 3600 flower-guy --random 2>/dev/null || true)"
+    elif [[ -f "$_PY_CHAR" ]]; then
+        _char_raw="$(run_cached character 3600 python3 "$_PY_CHAR" 2>/dev/null || true)"
+    fi
 fi
 
 if [[ -n "$_char_raw" ]]; then
@@ -329,27 +367,27 @@ _wline "${c_fact}${_random_fact}${c0}"
 
 # ── Injection framework (Layer 2 — Python widgets, centrally cached) ──────
 # TTLs: random 24 h · weather 15 min · stocks 5 min · news 10 min
-# run_cached is defined above; caches to ~/.cache/floweros/motd/<name>.txt
+# run_cached is defined above; caches to ~/.cache/floweros/fotd/<name>.txt
 
-if [[ -z "${FLOWER_MOTD_NO_INJECT:-}" && -d "$_MOTD_PY_LIB" ]]; then
-    if [[ -n "${FLOWER_MOTD_RANDOM:-}" && -f "$_MOTD_PY_LIB/provider_random.py" ]]; then
+if [[ -z "${FLOWER_FOTD_NO_INJECT:-}${FLOWER_MOTD_NO_INJECT:-}" && -d "$_MOTD_PY_LIB" ]]; then
+    if [[ -n "${FLOWER_FOTD_RANDOM:-}${FLOWER_MOTD_RANDOM:-}" && -f "$_MOTD_PY_LIB/provider_random.py" ]]; then
         _run_widget random  86400 python3 "$_MOTD_PY_LIB/provider_random.py"  || true
     fi
-    if [[ -n "${FLOWER_MOTD_WEATHER:-}" && -f "$_MOTD_PY_LIB/provider_weather.py" ]]; then
+    if [[ -n "${FLOWER_FOTD_WEATHER:-}${FLOWER_MOTD_WEATHER:-}" && -f "$_MOTD_PY_LIB/provider_weather.py" ]]; then
         _run_widget weather   900 python3 "$_MOTD_PY_LIB/provider_weather.py" || true
     fi
-    if [[ -n "${FLOWER_MOTD_STOCKS:-}" && -f "$_MOTD_PY_LIB/provider_stocks.py" ]]; then
+    if [[ -n "${FLOWER_FOTD_STOCKS:-}${FLOWER_MOTD_STOCKS:-}" && -f "$_MOTD_PY_LIB/provider_stocks.py" ]]; then
         _run_widget stocks    300 python3 "$_MOTD_PY_LIB/provider_stocks.py"  || true
     fi
-    if [[ -n "${FLOWER_MOTD_NEWS:-}" && -f "$_MOTD_PY_LIB/provider_news.py" ]]; then
+    if [[ -n "${FLOWER_FOTD_NEWS:-}${FLOWER_MOTD_NEWS:-}" && -f "$_MOTD_PY_LIB/provider_news.py" ]]; then
         _run_widget news      600 python3 "$_MOTD_PY_LIB/provider_news.py"    || true
     fi
 fi
 
 # ── Tower Defense daily reminder (pure-bash, no Python required) ──────────
 # Fires when: uptime < 10 min  OR  last shown > 24 h  OR  FLOWER_TD_FORCE=1.
-# Stamp: ~/.cache/floweros/motd/td_last   Disable: export FLOWER_MOTD_NO_TD=1
-if [[ -z "${FLOWER_MOTD_NO_TD:-}" ]]; then
+# Stamp: ~/.cache/floweros/fotd/td_last   Disable: export FLOWER_FOTD_NO_TD=1
+if [[ -z "${FLOWER_FOTD_NO_TD:-}${FLOWER_MOTD_NO_TD:-}" ]]; then
     _td_stamp="$_CACHE_DIR/td_last"
     _td_show=0
     if [[ -n "${FLOWER_TD_FORCE:-}" ]]; then

@@ -21,13 +21,16 @@
 
 FlowerOS is a terminal-first shell environment designed to make local development, document publishing, system orchestration, and themed interaction feel structured rather than improvised. It is not a kernel replacement. It is a layered shell ecosystem: a shared install engine, runtime helpers, themed output conventions, utility frontends, and environment scaffolding assembled into a single coherent layer.
 
-The current implementation (Tier 5, v1.2.5.x) runs on Linux and WSL2.
+The current implementation (Tier 5, v1.3.0) runs on Linux, WSL2, and Windows (PowerShell).
 
-**What ships in v1.2.5.1:**
+**What ships in v1.3.0:**
 - **Shared install engine** (`lib/install-core.sh`) — unified build, deploy, inject, download, auth, and remove logic shared across all install modes
+- **PowerShell install mirror** (`install.ps1`) — native Windows install that mirrors the bash install exactly, using the same directory layout, sentinel markers, and version tracking
+- **Shell publishing** — bash and PowerShell profile scripts are published as a pair: same palette, same environment variables, same theme manifests, one truth across both shells
 - **Universal language runner** (`flower-run`) — auto-detects and runs C, C++, CUDA, Python, Julia, Rust, Go, Fortran, and more with optional HPC and GPU flags
 - **Publishing workflow** (`fp`) — LaTeX document tool: `new`, `edit`, `build`, `view`, `watch`, `deps`
 - **Shell environment layer** (`.flowerrc`, `lib/shell_extras.sh`) — structured aliases, lazy-loaded tools, safe defaults, and themed MOTD
+- **Profile sync** (`lib/profile_sync.sh`, `lib/profile_sync.ps1`) — theme state published bidirectionally between bash and PowerShell via shared manifests
 - **Games suite** — chess with alpha-beta engine, colony hex survival, tower defense, interactive launcher
 - **MOTD system** (`share/motd/`) — composable data providers for weather, stocks, news, and random facts
 - **Theming layer** — consistent color palette, stage indicators, progress bars, and terminal formatting rules applied uniformly across all tools
@@ -123,7 +126,7 @@ FlowerOS is organized as a layered shell environment. Each tier is a distinct de
 | 2 | Existing Linux | Base kernel wrapper — intercept and enhance | Prototype (`src/kernel/`) |
 | 3 | WSL safe mode | User sandbox + experimental desktop window | Partial |
 | 4 | Windows native | Persistent state store + named-pipe IPC bus | Scaffolded (`tier4/`) |
-| 5 | Linux / WSL | **Current implementation** — tools, themes, network, GPU | **Active** (v1.2.5.x) |
+| 5 | Linux / WSL / Windows | **Current implementation** — tools, themes, network, GPU, PowerShell mirror | **Active** (v1.3.0) |
 
 ### Tier 4 — Windows Substrate
 
@@ -228,6 +231,66 @@ The user knows exactly what was installed, where it lives, and how to remove eve
 
 ---
 
+## Shell Publishing
+
+Shell publishing is a design technique, not a feature. It is the principle that makes FlowerOS installations permanent across both bash and PowerShell without either shell being a second-class citizen.
+
+### The Problem
+
+A shell environment installed into `~/.bashrc` on Linux disappears the moment the user opens PowerShell on Windows. Environment variables, theme palettes, path exports, and version tracking all evaporate. The install is "permanent" in one shell and invisible in the other. Cross-platform tools that solve this usually do it by picking one shell as the source of truth and treating the other as a sync target — which means one side is always stale, always late, always a copy.
+
+### The Technique
+
+Shell publishing treats bash and PowerShell as two **publication targets** of a single environment specification. The install engine does not install *into* a shell. It **publishes** the environment *to* both shells simultaneously, using each shell's native mechanisms:
+
+```
+                     ┌──────────────────┐
+                     │  install-core.sh │   (single source of truth)
+                     │  Directory layout │
+                     │  Version tracking │
+                     │  Sentinel markers │
+                     └────────┬─────────┘
+                              │
+              ┌───────────────┼───────────────┐
+              ▼               ▼               ▼
+        install.sh      install.ps1    install-permanent.sh
+              │               │               │
+              ▼               ▼               ▼
+        ~/.bashrc       $PROFILE        /etc/bash.bashrc
+        .flowerrc     profile_sync.ps1  /etc/profile.d/
+```
+
+**What gets published (identically) to both shells:**
+- `FLOWEROS_ROOT`, `FLOWEROS_BIN`, `FLOWEROS_LIB` — same paths, same layout
+- `FLOWEROS_VERSION` — same version string, read from the same `VERSION` file
+- Theme palette — same hex values, same variable names (`FLOWEROS_OMP_PRIMARY`, etc.)
+- Sentinel markers — same comment blocks mark the injected region in both `.bashrc` and `$PROFILE`
+
+**What is native to each shell:**
+- Bash gets `source .flowerrc` and `export` statements
+- PowerShell gets `$env:` assignments, Oh My Posh init, and `Set-PSReadLineOption` theming
+- Each shell's integration is written in that shell's idiom — no wrapper layers, no translation shims
+
+### Why It Matters
+
+The result is that `flower --version` returns the same answer whether called from bash or PowerShell. The theme looks the same. The paths resolve to the same directories. The install is not "bash-first with a PowerShell adapter" — it is a single environment state published to two shells.
+
+This is what makes the install **permanent across the system**, not just permanent within one profile file. The technique extends to any shell that can set environment variables and source a profile script — zsh, fish, or nushell would each become another publication target with the same pattern.
+
+### Manifest Files
+
+The bridge between shells is a set of plain key-value manifest files:
+
+| File | Written By | Read By | Purpose |
+|------|-----------|---------|---------|
+| `~/.floweros/theme_sync.env` | `profile_sync.sh` | `profile_sync.ps1` | Theme palette state |
+| `~/.config/flower/theme.env` | Both | Both | Canonical cross-platform palette |
+| `~/.floweros/VERSION` | Install engine | `bin/flower`, both profile syncs | Version + build type |
+
+No database. No registry. No IPC. Just files that both shells can read and write.
+
+---
+
 ## Version Progression
 
 | Version | Highlights |
@@ -235,11 +298,11 @@ The user knows exactly what was installed, where it lives, and how to remove eve
 | v1.0 | Initial user-mode install, ASCII utilities, `.flowerrc` grafting |
 | v1.1 | Theming engine, PowerShell integration, feature modules |
 | v1.2.x | **Stable** — games suite, `flower-run`, `fp`, core customization |
-| v1.2.x | Stable — games suite, `flower-run`, `fp`, core customization |
-| **v1.2.5.1** | **Current** — shared install engine, permanent install, network layer, MOTD providers, Tier 4 scaffolding, Flower AI subsystem (optional) |
-| v1.3+ | Planned — Tier 4 IPC broker, cross-platform state sync, expanded runner, package update handling |
+| v1.2.5.1 | Shared install engine, permanent install, network layer, MOTD providers, Tier 4 scaffolding, Flower AI subsystem (optional) |
+| **v1.3.0** | **Current** — PowerShell install mirror, shell publishing (bash↔PS profile sync), cross-platform permanent installs, profile_sync.sh/.ps1, version selector, cleanup and stabilization |
+| v1.3+ | Tier 4 IPC broker, cross-platform state sync, expanded runner, package update handling |
 
-> **Stability note:** v1.2.5.x is the current stable branch. The network routing layer (`src/network/`) is explicitly experimental. All experimental output is printed in red in the terminal.
+> **Stability note:** v1.3.0 is the current stable release. The network routing layer (`src/network/`) is explicitly experimental. All experimental output is printed in red in the terminal.
 
 ---
 
@@ -265,9 +328,8 @@ The user knows exactly what was installed, where it lives, and how to remove eve
 - MOTD and themed startup behavior
 - Script-based install and clean removal
 
-**Experimental in v1.2.5.x:**
+**Experimental in v1.3.0:**
 - Network routing layer (`src/network/`)
-- Permanent system-level install mode
 - Tier 4 IPC broker and Windows state store
 
 **Planned:**
