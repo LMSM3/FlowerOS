@@ -1,0 +1,427 @@
+% ══════════════════════════════════════════════════════════════════════════════
+%  bench_integrators.tex
+%  VSEPR-SIM Benchmark Suite — Layer 1
+%  Velocity Verlet (NVE) vs Langevin-BAOAB (NVT) Integrator Comparison
+%
+%  Compile:  pdflatex bench_integrators.tex   (twice for TOC / refs)
+%            or: latexmk -pdf bench_integrators.tex
+%
+%  Part of the FlowerOS HPC stack  (docs/bench_integrators.tex)
+% ══════════════════════════════════════════════════════════════════════════════
+
+\documentclass[11pt,a4paper]{article}
+
+% ── packages ──────────────────────────────────────────────────────────────────
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage[margin=2.4cm]{geometry}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage{listings}
+\usepackage{hyperref}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,fit,calc,shapes.geometric}
+
+% ── colours (FlowerOS pastel palette) ─────────────────────────────────────────
+\definecolor{fosMint}{HTML}{87CEEB}
+\definecolor{fosMagenta}{HTML}{D8A0D8}
+\definecolor{fosGreen}{HTML}{87D687}
+\definecolor{fosYellow}{HTML}{F0E68C}
+\definecolor{fosGrey}{HTML}{A0A0A0}
+\definecolor{fosBlue}{HTML}{6495ED}
+\definecolor{fosOrange}{HTML}{FFA07A}
+\definecolor{fosCode}{HTML}{F5F5F5}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=fosBlue,
+  citecolor=fosBlue,
+  urlcolor=fosMint,
+  pdftitle={VSEPR Benchmark Layer 1 -- Integrators},
+  pdfauthor={FlowerOS Project},
+}
+
+% ── listings style ────────────────────────────────────────────────────────────
+\lstset{
+  basicstyle=\ttfamily\small,
+  backgroundcolor=\color{fosCode},
+  frame=single,
+  framerule=0.4pt,
+  rulecolor=\color{fosGrey},
+  keywordstyle=\color{fosBlue}\bfseries,
+  commentstyle=\color{fosGrey}\itshape,
+  stringstyle=\color{fosOrange},
+  showstringspaces=false,
+  breaklines=true,
+  language=C++,
+}
+
+% ── theorem-like environments ─────────────────────────────────────────────────
+\theoremstyle{definition}
+\newtheorem{definition}{Definition}[section]
+\newtheorem{contract}[definition]{Contract}
+\theoremstyle{plain}
+\newtheorem{proposition}[definition]{Proposition}
+
+% ── macros ────────────────────────────────────────────────────────────────────
+\newcommand{\VV}{\textsc{vv}}
+\newcommand{\LG}{\textsc{lg}}
+\newcommand{\NVE}{\textsc{nve}}
+\newcommand{\NVT}{\textsc{nvt}}
+\newcommand{\dt}{\Delta t}
+\newcommand{\kb}{k_{\mathrm{B}}}
+\newcommand{\half}{\tfrac{1}{2}}
+
+% ── title ─────────────────────────────────────────────────────────────────────
+\title{%
+  \textbf{VSEPR-SIM Benchmark Suite} \\[4pt]
+  \Large Layer 1: Integrator Performance Comparison \\[14pt]
+  \normalsize Velocity Verlet (\NVE) \quad vs \quad Langevin-BAOAB (\NVT)%
+}
+\author{FlowerOS Project}
+\date{v5.0.14 \quad \today}
+
+% ══════════════════════════════════════════════════════════════════════════════
+\begin{document}
+\maketitle
+\thispagestyle{empty}
+
+\begin{abstract}
+This document describes \textbf{Layer~1} of the VSEPR-SIM benchmark suite:
+a wall-clock and accuracy comparison of two plugin integrators shipped in
+\texttt{src/int/integrators.hpp}.
+The \emph{Velocity Verlet} (\VV, microcanonical \NVE) integrator is compared
+against the \emph{Langevin-BAOAB} (\LG, canonical \NVT) integrator over
+log-spaced atom counts $N \in [32, 2048]$.
+For each integrator and system size the benchmark records median time-per-step,
+atom-step throughput, energy drift per atom (\VV\ only), and temperature
+accuracy (\LG\ only).
+All results are emitted as pipe-ready CSV to stdout and a human-readable
+summary to stderr.
+\end{abstract}
+
+\tableofcontents
+\newpage
+
+% ──────────────────────────────────────────────────────────────────────────────
+\section{Background and Motivation}
+\label{sec:background}
+
+Molecular dynamics (MD) simulation correctness and performance depend
+critically on the choice of time integrator.  Two broad families exist:
+
+\begin{description}[leftmargin=3em,labelwidth=2.5em]
+  \item[\NVE] \emph{Microcanonical} ensemble: total energy $E = K + U$ is
+	conserved.  The \emph{Velocity Verlet} algorithm is the canonical
+	representative — it is symplectic (area-preserving in phase space),
+	time-reversible, and second-order accurate in $\dt$.
+
+  \item[\NVT] \emph{Canonical} ensemble: temperature $T$ is maintained by a
+	thermostat.  The \emph{Langevin equation} adds a friction term and a
+	Gaussian random force to Newton's equations, coupling the system to an
+	implicit heat bath.  The BAOAB splitting scheme~\cite{baoab2012} is used
+	here for its superior accuracy at moderate friction.
+\end{description}
+
+The FlowerOS VSEPR simulation stack exposes both integrators as plugin
+objects behind a common step-interface, making a side-by-side comparison
+straightforward.  This benchmark answers:
+
+\begin{enumerate}
+  \item How much per-step overhead does Langevin friction and RNG add relative
+	to pure Velocity Verlet?
+  \item At what system size does the $\mathcal{O}(N^2)$ force evaluation
+	dominate and make the integrator overhead negligible?
+  \item Does Velocity Verlet conserve energy (\emph{drift per atom}) to the
+	expected level for the chosen time-step?
+  \item Does Langevin maintain temperature to within a few percent after a
+	short equilibration window?
+\end{enumerate}
+
+% ──────────────────────────────────────────────────────────────────────────────
+\section{Integrator Algorithms}
+\label{sec:algorithms}
+
+\subsection{Velocity Verlet (NVE)}
+\label{sec:vv}
+
+Given positions $\mathbf{r}(t)$, velocities $\mathbf{v}(t)$, forces
+$\mathbf{F}(t)$, and masses $m_i$, one Velocity Verlet step proceeds as:
+
+\begin{align}
+  \mathbf{v}(t + \tfrac{\dt}{2}) &= \mathbf{v}(t)
+	+ \frac{\mathbf{F}(t)}{m_i}\,\frac{\dt}{2}
+	\label{eq:vv-halfkick}\\
+  \mathbf{r}(t + \dt) &= \mathbf{r}(t)
+	+ \mathbf{v}(t + \tfrac{\dt}{2})\,\dt
+	\label{eq:vv-drift}\\
+  \mathbf{v}(t + \dt) &= \mathbf{v}(t + \tfrac{\dt}{2})
+	+ \frac{\mathbf{F}(t+\dt)}{m_i}\,\frac{\dt}{2}
+	\label{eq:vv-halfkick2}
+\end{align}
+
+where $\mathbf{F}(t+\dt)$ is evaluated from the updated positions.
+The algorithm is symplectic and time-reversible; the global energy error
+is $\mathcal{O}(\dt^2)$ per step, bounded $\mathcal{O}(\dt^2)$ in total
+for any finite integration time (no secular drift for harmonic systems).
+
+\subsection{Langevin-BAOAB (NVT)}
+\label{sec:langevin}
+
+The Langevin equation of motion is:
+\begin{equation}
+  m_i\,\ddot{\mathbf{r}}_i = \mathbf{F}_i
+	- \gamma\,m_i\,\dot{\mathbf{r}}_i
+	+ \sqrt{2\,\gamma\,m_i\,\kb T}\;\boldsymbol{\xi}(t)
+  \label{eq:langevin}
+\end{equation}
+where $\gamma$ [ps$^{-1}$] is the friction coefficient, $T$ the target
+temperature, and $\boldsymbol{\xi}$ Gaussian white noise with
+$\langle\xi_\alpha(t)\xi_\beta(t')\rangle = \delta_{\alpha\beta}\,\delta(t-t')$.
+
+The \textbf{BAOAB} splitting~\cite{baoab2012} factorises the propagator into:
+\begin{enumerate}
+  \item \textbf{B}: half-step velocity update from forces
+  \item \textbf{A}: half-step coordinate drift
+  \item \textbf{O}: full Ornstein--Uhlenbeck velocity relaxation
+	$\mathbf{v} \leftarrow e^{-\gamma\dt}\mathbf{v}
+	+ \sqrt{\kb T/m}\,(1-e^{-2\gamma\dt})^{1/2}\,\boldsymbol{\xi}$
+  \item \textbf{A}: second half-step drift
+  \item \textbf{B}: second half-step velocity update from new forces
+\end{enumerate}
+
+BAOAB is second-order accurate in $\dt$ for configurational observables
+and exhibits smaller position autocorrelation error than the simpler
+BBK~(Br{\"u}nger-Brooks-Karplus) scheme.
+
+% ──────────────────────────────────────────────────────────────────────────────
+\section{Benchmark Design}
+\label{sec:design}
+
+\subsection{Force Model}
+
+Both integrators drive an identical $\mathcal{O}(N^2)$ Lennard-Jones
+force field:
+\begin{equation}
+  U_{\mathrm{LJ}}(r) = 4\varepsilon\left[
+	\left(\frac{\sigma}{r}\right)^{12}
+	- \left(\frac{\sigma}{r}\right)^{6}\right]
+  \label{eq:lj}
+\end{equation}
+with Ar-like parameters $\varepsilon = 0.1$\,kcal/mol,
+$\sigma = 3.4$\,\AA, minimum distance clamp $r_{\min} = 0.5$\,\AA.
+No cutoff is applied (all pairs evaluated), mirroring the VSEPR nonbonded
+kernel baseline.
+
+\subsection{System Generation}
+
+Atoms are placed at uniform random positions in a $[-15, 15]^3$\,\AA\ box
+with velocities drawn from $\mathcal{N}(0,\,0.5)$\,\AA/ps and masses
+sampled uniformly from \{H\,1.008, C\,12.011, N\,14.007, O\,15.999\}\,u.
+
+\subsection{Measurement Protocol}
+
+\begin{enumerate}
+  \item For each $N$ in a log-spaced sequence $[N_{\min}, N_{\max}]$:
+  \begin{enumerate}
+	\item Run $R$ independent repeats, each with a distinct RNG seed derived
+	  from the base seed.
+	\item Each repeat: build a fresh particle state, compute initial energy,
+	  run exactly \texttt{n\_steps} MD steps (force~+ integration timed
+	  together), compute final energy and temperature.
+	\item Report the \emph{median} wall time across repeats.
+  \end{enumerate}
+\end{enumerate}
+
+\subsection{Reported Metrics}
+
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+Column & Formula & Applies to \\
+\midrule
+\texttt{median\_ms\_per\_step}
+  & $\tilde{t}_{\mathrm{repeat}} / N_{\mathrm{steps}}$ & both \\
+\texttt{atom\_steps\_per\_sec}
+  & $N \cdot N_{\mathrm{steps}} / (\tilde{t}_{\mathrm{repeat}} \times 10^{-3})$
+  & both \\
+\texttt{energy\_drift\_per\_atom}
+  & $|E_{\mathrm{final}} - E_{\mathrm{initial}}| / N$
+  & \VV\ only \\
+\texttt{temp\_error\_pct}
+  & $|T_{\mathrm{actual}} - T_{\mathrm{target}}| / T_{\mathrm{target}} \times 100$
+  & \LG\ only \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{CSV Schema}
+
+\begin{lstlisting}[language={},basicstyle=\ttfamily\footnotesize]
+n_atoms,integrator,median_ms_per_step,atom_steps_per_sec,
+energy_drift_per_atom,temp_error_pct
+\end{lstlisting}
+
+Fields without a value for a given integrator are written as \texttt{n/a}.
+
+% ──────────────────────────────────────────────────────────────────────────────
+\section{Implementation Notes}
+\label{sec:impl}
+
+\subsection{Plugin Interface}
+
+Both integrators share a two-call step pattern, allowing the force
+evaluation to be injected between the first and second velocity half-kick:
+
+\begin{lstlisting}
+// Velocity Verlet
+vv.step(coords, velocities, forces, dt, masses);   // half-kick + drift
+eval_forces(state);                                // O(N^2) LJ
+vv.step_second_half(velocities, forces, dt, masses); // second half-kick
+
+// Langevin BAOAB
+lang.step(coords, velocities, forces, dt, masses); // B-A-O-A
+eval_forces(state);                                // O(N^2) LJ
+lang.step_final(velocities, forces, dt, masses);  // final B
+\end{lstlisting}
+
+This design means the benchmark measures the \emph{true cost of one
+complete MD step} including force evaluation.
+
+\subsection{Energy and Temperature Calculations}
+
+Kinetic energy:
+\begin{equation}
+  K = \sum_{i=1}^{N}\sum_{d \in \{x,y,z\}}
+	  \half m_{i}\,v_{id}^{2}
+\end{equation}
+
+Instantaneous temperature from equipartition:
+\begin{equation}
+  T_{\mathrm{inst}}
+	= \frac{2K}{(3N-3)\,\kb}
+  \label{eq:temp}
+\end{equation}
+with $\kb = 1.987\times10^{-3}$\,kcal/mol/K.
+
+\subsection{Build and Run}
+
+The target is registered in \texttt{tests/CMakeLists.txt} as Group~11:
+\begin{lstlisting}[language={},basicstyle=\ttfamily\small]
+add_executable(bench_integrators bench_integrators.cpp)
+target_link_libraries(bench_integrators vsepr_core vsepr_sim)
+vsepr_add_test(NAME BenchIntegrators TARGET bench_integrators
+			   LABELS benchmark integrator)
+\end{lstlisting}
+
+Invocation examples:
+\begin{lstlisting}[language=bash,basicstyle=\ttfamily\small]
+./bench_integrators                                  # stdout CSV + stderr summary
+./bench_integrators --min 32 --max 2048 --repeats 5 # custom range
+./bench_integrators --csv > integrators.csv          # pipe-only CSV
+./bench_integrators --n_steps 500 --dt 0.0005        # tighter dt
+\end{lstlisting}
+
+% ──────────────────────────────────────────────────────────────────────────────
+\section{Expected Results and Interpretation}
+\label{sec:results}
+
+\subsection{Throughput Scaling}
+
+For small $N$, integrator overhead (RNG, friction update) is non-negligible
+compared to the force evaluation.  As $N$ grows, the $\mathcal{O}(N^2)$ force
+loop dominates and both integrators should converge to similar wall-time
+per step.  The crossover typically occurs around $N \sim 200$–500 for a
+scalar CPU implementation.
+
+\subsection{Energy Drift (VV)}
+
+For a time-step $\dt = 0.001$\,ps with LJ forces, energy drift per atom
+should satisfy:
+\begin{equation}
+  \frac{\Delta E}{N} \lesssim \mathcal{O}\!\left(\varepsilon\,(\dt/\tau)^2\right)
+\end{equation}
+where $\tau \sim \sigma\,\sqrt{m/\varepsilon}$ is the LJ time unit.  Values
+significantly above this indicate numerical instability (reduce $\dt$).
+
+\subsection{Temperature Accuracy (Langevin)}
+
+After $N_{\mathrm{steps}} \approx 100$ steps from a random configuration,
+the system has not fully equilibrated.  Temperature errors of 10–40\% are
+normal at short run times; the field represents convergence rate, not
+steady-state error.  At long run times ($N_{\mathrm{steps}} \gtrsim 5000$)
+errors below 5\% are expected for $\gamma = 1.0$\,ps$^{-1}$.
+
+% ──────────────────────────────────────────────────────────────────────────────
+\section{Defaults and CLI Reference}
+\label{sec:cli}
+
+\begin{center}
+\begin{tabular}{llll}
+\toprule
+Flag & Type & Default & Description \\
+\midrule
+\texttt{--min}      & int    & 32    & Minimum atom count \\
+\texttt{--max}      & int    & 2048  & Maximum atom count \\
+\texttt{--steps}    & int    & 8     & Number of log-spaced size points \\
+\texttt{--n\_steps} & int    & 100   & MD steps per timing window \\
+\texttt{--repeats}  & int    & 3     & Independent repeats (median taken) \\
+\texttt{--seed}     & uint32 & 42    & Base RNG seed \\
+\texttt{--temp}     & double & 300.0 & Langevin target temperature (K) \\
+\texttt{--friction} & double & 1.0   & Langevin friction $\gamma$ (ps$^{-1}$) \\
+\texttt{--dt}       & double & 0.001 & Time-step (ps) \\
+\texttt{--csv}      &        &       & Suppress stderr human summary \\
+\texttt{--no-header}&        &       & Omit CSV header line \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+% ──────────────────────────────────────────────────────────────────────────────
+\section{Integration with the Benchmark Suite}
+\label{sec:suite}
+
+\begin{description}
+  \item[Group 10 — GPU vs CPU (existing)] \texttt{bench\_gpu\_cpu}:
+	compares scalar CPU and CUDA GPU for LJ energy evaluation.
+  \item[\textbf{Group 11 — Integrators (this document)}]
+	\texttt{bench\_integrators}: VV vs Langevin-BAOAB per-step cost and
+	accuracy.
+  \item[Group 12 — Spatial Kernels (companion document)]
+	\texttt{bench\_spatial\_kernels}: direct $\mathcal{O}(N^2)$ vs
+	simulation octree (see \texttt{docs/bench\_spatial\_kernels.tex}).
+\end{description}
+
+All three groups are reachable via CTest labels:
+\begin{lstlisting}[language=bash,basicstyle=\ttfamily\small]
+ctest -L benchmark          # all three groups
+ctest -L integrator         # Group 11 only
+ctest -L "benchmark;gpu"    # Group 10 only
+\end{lstlisting}
+
+% ──────────────────────────────────────────────────────────────────────────────
+\begin{thebibliography}{9}
+
+\bibitem{baoab2012}
+B.~Leimkuhler and C.~Matthews,
+\emph{Rational Construction of Stochastic Numerical Methods for Molecular
+Sampling},
+Appl.\ Math.\ Res.\ eXpress \textbf{2013}(1), 34--56 (2012).
+
+\bibitem{swope1982}
+W.~C.~Swope, H.~C.~Andersen, P.~H.~Berens, K.~R.~Wilson,
+\emph{A computer simulation method for the calculation of equilibrium
+constants for the association of integral membrane proteins},
+J.\ Chem.\ Phys.\ \textbf{76}, 637 (1982).
+
+\bibitem{frenkelsmit}
+D.~Frenkel and B.~Smit,
+\emph{Understanding Molecular Simulation: From Algorithms to Applications},
+2nd~ed., Academic Press (2002).
+
+\end{thebibliography}
+
+\end{document}
